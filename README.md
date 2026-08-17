@@ -30,8 +30,6 @@ A solução utiliza uma arquitetura baseada em microsserviços:
                                   └──────────────┘            └──────────────┘
 ```
 
-
-
 ## Tecnologias
 
 ### Frontend
@@ -40,27 +38,20 @@ A solução utiliza uma arquitetura baseada em microsserviços:
 - TypeScript
 - SCSS
 
-
-
 ### Backend
 
 - Go
 - Gin
-
-
+- GORM
 
 ### Banco de dados
 
 - PostgreSQL 15
 
-
-
 ### Infraestrutura
 
 - Docker
 - Docker Compose
-
-
 
 ## Pré-requisitos
 
@@ -68,8 +59,6 @@ A solução utiliza uma arquitetura baseada em microsserviços:
 - Go 1.21+
 - Node.js
 - npm
-
-
 
 ## Estrutura
 
@@ -79,6 +68,9 @@ Korp_Teste_Dihann/
 │   ├── estoque/
 │   │   ├── cmd/
 │   │   │   └── main.go
+│   │   ├── internal/
+│   │   │   ├── config/config.go
+│   │   │   └── database/database.go
 │   │   ├── migrations/
 │   │   ├── go.mod
 │   │   └── go.sum
@@ -109,15 +101,23 @@ Korp_Teste_Dihann/
 └── README.md
 ```
 
-
-
 ## Configuração
 
-Crie o arquivo `.env` a partir do `.env.example`.
+Os microsserviços utilizam variáveis de ambiente para configuração.
 
-## Execução
+Cada serviço possui seu próprio conjunto de variáveis, utilizando prefixos para evitar conflitos:
 
+```text
+ESTOQUE_DB_*
+ESTOQUE_API_PORT
 
+FATURAMENTO_DB_*
+FATURAMENTO_API_PORT
+```
+
+O projeto disponibiliza o arquivo `.env.example` como referência para configuração do ambiente local.
+
+Em ambientes de produção, as mesmas variáveis devem ser fornecidas diretamente pela infraestrutura de execução, como Azure ou containers, sem necessidade de disponibilizar um arquivo `.env`.
 
 ### Bancos de dados
 
@@ -140,8 +140,6 @@ Para interromper os containers:
 ```bash
 docker compose down
 ```
-
-
 
 ### Microsserviço de Estoque
 
@@ -185,8 +183,6 @@ npm start
 | Faturamento API        | `8081` |
 | PostgreSQL Estoque     | `5433` |
 | PostgreSQL Faturamento | `5434` |
-
-
 
 
 ## Documentação Técnica
