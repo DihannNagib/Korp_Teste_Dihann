@@ -16,8 +16,8 @@ type Config struct {
 	ServerPort string
 }
 
-func Load() *Config {
-	if err := godotenv.Load("../../.env"); err != nil {
+func Load(envFile string) *Config {
+	if err := godotenv.Load(envFile); err != nil {
 		log.Printf(".env não encontrado; usando variáveis de ambiente")
 	}
 

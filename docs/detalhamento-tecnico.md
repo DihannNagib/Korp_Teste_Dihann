@@ -23,47 +23,57 @@ A solução utiliza uma arquitetura baseada em microsserviços, com separação 
                                               │     Angular      │
                                               │      :4200       │
                                               └────────┬─────────┘
-                                                        │
-                                          ┌─────────────┴─────────────┐
-                                          │                           │
-                                  ┌──────▼───────┐            ┌──────▼───────┐
-                                  │   Estoque    │            │ Faturamento  │
-                                  │    :8080     │            │    :8081     │
-                                  │      Go      │            │      Go      │
-                                  └──────┬───────┘            └──────┬───────┘
-                                          │                           │
-                                  ┌──────▼───────┐            ┌──────▼───────┐
-                                  │ PostgreSQL   │            │ PostgreSQL   │
-                                  │    :5433     │            │    :5434     │
-                                  └──────────────┘            └──────────────┘
-
+                                                       │
+                                         ┌─────────────┴─────────────┐
+                                         │                           │
+                                 ┌───────▼───────┐           ┌───────▼───────┐
+                                 │    Estoque    │           │  Faturamento  │
+                                 │     :8080     │           │     :8081     │
+                                 │      Go       │           │      Go       │
+                                 └───────┬───────┘           └───────┬───────┘
+                                         │                           │
+                                 ┌───────▼───────┐           ┌───────▼───────┐
+                                 │  PostgreSQL   │           │  PostgreSQL   │
+                                 │     :5433     │           │     :5434     │
+                                 └───────────────┘           └───────────────┘
 ```
 
 
 
-## 2.1 Serviço de Estoque
+### 2.1 Serviço de Estoque
 
-O serviço de Estoque será responsável pelo domínio de produtos e controle de saldos.
+O serviço de Estoque é responsável pelo domínio de produtos e pelo controle de seus saldos.
 
-Atualmente, o serviço possui:
+A implementação atual contempla:
 
 - configuração por variáveis de ambiente;
-- carregamento de `.env` para desenvolvimento local;
 - conexão com PostgreSQL utilizando GORM;
-- validação da configuração obrigatória;
-- endpoint de Health Check;
-- verificação da disponibilidade da conexão com o banco.
-- **Porta:** `8080`
-- **Health Check:** `GET /health`
+- migration da tabela `produtos`;
+- entidade de domínio `Produto`;
+- regra de domínio para impedir saldo negativo;
+- repository para persistência de produtos;
+- criação de produtos;
+- busca de produto por código;
+- listagem de produtos;
+- ajuste de saldo;
+- tratamento de código de produto duplicado;
+- tratamento de produto não encontrado;
+- transação para alteração de saldo;
+- bloqueio pessimista com `FOR UPDATE`;
+- testes unitários do domínio;
+- testes do repository.
 
+**Porta:** `8080`
 
+**Health Check:** `GET /health`
 
-## 2.2 Serviço de Faturamento
+### 2.2 Serviço de Faturamento
 
 O serviço de Faturamento será responsável pelo domínio de notas fiscais.
 
-- **Porta:** `8081`
-- **Health Check:** `GET /health`
+**Porta:** `8081`
+
+**Health Check:** `GET /health`
 
 ---
 
@@ -87,7 +97,7 @@ O frontend foi inicializado em Angular e será utilizado para implementar as tel
 - Gin
 - GORM
 
-Os microsserviços backend são desenvolvidos em Go utilizando o framework Gin para criação das APIs HTTP e GORM para acesso ao banco de dados.
+Os microsserviços backend são desenvolvidos em Go utilizando Gin para criação das APIs HTTP e GORM para acesso ao banco de dados.
 
 ### 3.3 Banco de Dados
 
@@ -133,9 +143,7 @@ estoque_data
 faturamento_data
 ```
 
-Os volumes são utilizados para persistir os dados do PostgreSQL fora do ciclo de vida dos containers.
-
-Dessa forma, a remoção e recriação dos containers não implica, por padrão, na remoção dos dados armazenados nos volumes.
+Os volumes permitem persistir os dados do PostgreSQL independentemente do ciclo de vida dos containers.
 
 A remoção dos volumes é uma operação separada e deve ser realizada explicitamente quando necessário.
 
@@ -147,82 +155,47 @@ A remoção dos volumes é uma operação separada e deve ser realizada explicit
 
 A aplicação utiliza variáveis de ambiente para configuração dos microsserviços.
 
-Cada microsserviço possui seu próprio módulo de configuração, responsável por:
+Cada microsserviço possui seu próprio módulo de configuração, responsável por carregar e validar as variáveis necessárias.
 
-- carregar as variáveis de ambiente;
-- carregar o arquivo `.env` durante o desenvolvimento local;
-- validar as variáveis obrigatórias;
-- disponibilizar as configurações necessárias para os demais componentes do serviço.
-
-As variáveis são prefixadas de acordo com o microsserviço para evitar conflitos de configuração.
-
-Exemplo:
+As variáveis são prefixadas de acordo com o microsserviço:
 
 ```text
-ESTOQUE_DB_HOST
-ESTOQUE_DB_PORT
-ESTOQUE_DB_USER
-ESTOQUE_DB_PASSWORD
-ESTOQUE_DB_NAME
+ESTOQUE_DB_*
 ESTOQUE_API_PORT
 
-FATURAMENTO_DB_HOST
-FATURAMENTO_DB_PORT
-FATURAMENTO_DB_USER
-FATURAMENTO_DB_PASSWORD
-FATURAMENTO_DB_NAME
+FATURAMENTO_DB_*
 FATURAMENTO_API_PORT
 ```
 
-O projeto disponibiliza um arquivo:
+O projeto disponibiliza o arquivo `.env.example` como referência para configuração local.
 
-```
-.env.example
-```
-
-Para desenvolvimento local, deve ser criado um arquivo `.env` na raiz do projeto a partir do exemplo.
-
-O arquivo `.env` não deve ser versionado no repositório.
+O arquivo `.env` não deve ser versionado.
 
 ### 5.1 Desenvolvimento local
 
 Durante o desenvolvimento, o pacote `godotenv` é utilizado para carregar as variáveis definidas no arquivo `.env`.
 
-O fluxo de configuração é:
+Fluxo:
 
-```
+```text
 .env
  ↓
 godotenv.Load()
  ↓
-variáveis de ambiente do processo
+variáveis de ambiente
  ↓
 config.Load()
  ↓
-Configuração tipada do microsserviço
+configuração da aplicação
 ```
 
-Cada microsserviço carrega somente as variáveis necessárias ao seu próprio domínio.
+
 
 ### 5.2 Produção
 
-Em produção, não é necessário disponibilizar um arquivo `.env`.
+Em produção, as variáveis podem ser fornecidas diretamente pela infraestrutura de execução, como containers ou Azure App Service.
 
-As variáveis de ambiente podem ser fornecidas diretamente pela infraestrutura de execução, como containers, Azure App Service ou outros serviços de hospedagem.
-
-O código da aplicação não precisa ser alterado entre desenvolvimento e produção:
-
-```
-Desenvolvimento:
-.env → godotenv → ambiente do processo → aplicação
-
-Produção:
-Azure/Container → ambiente do processo → aplicação
-```
-
-Dessa forma, o mesmo mecanismo de configuração baseado em `os.LookupEnv()` é utilizado nos dois ambientes.
-
-Credenciais e demais informações sensíveis não são versionadas no repositório.
+Não é necessário disponibilizar um arquivo `.env`.
 
 ---
 
@@ -230,35 +203,92 @@ Credenciais e demais informações sensíveis não são versionadas no repositó
 
 ## 6. Organização do Backend
 
-Cada microsserviço possui seu próprio módulo Go.
-
-A existência de módulos independentes permite que cada microsserviço gerencie suas próprias dependências.
+Cada microsserviço possui seu próprio módulo Go e gerencia suas próprias dependências.
 
 ### 6.1 Gerenciamento de Dependências
 
-O backend utiliza Go Modules para gerenciamento das dependências.
+O backend utiliza Go Modules.
 
 Cada microsserviço possui:
 
-- `go.mod` — definição do módulo e suas dependências;
-- `go.sum` — registro dos checksums das dependências.
+- `go.mod`;
+- `go.sum`.
 
 
 
 ### 6.2 Conexão com Banco
 
-Cada microsserviço encapsula sua própria conexão com banco de dados.
-
-A estrutura segue o princípio de isolamento por serviço:
+Cada microsserviço possui sua própria conexão com banco de dados:
 
 ```text
 Estoque
     └── internal/database
             └── PostgreSQL do Estoque
+
 Faturamento
     └── internal/database
             └── PostgreSQL do Faturamento
 ```
+
+
+
+### 6.3 Domínio de Estoque
+
+O domínio de Estoque possui a entidade `Produto`, responsável por representar um produto e seu saldo atual.
+
+
+| Campo       | Tipo        | Descrição                  |
+| ----------- | ----------- | -------------------------- |
+| `id`        | `uint`      | Identificador do produto   |
+| `codigo`    | `string`    | Código único do produto    |
+| `descricao` | `string`    | Descrição do produto       |
+| `saldo`     | `int`       | Saldo atual em estoque     |
+| `createdAt` | `time.Time` | Data de criação            |
+| `updatedAt` | `time.Time` | Data da última atualização |
+
+
+A entidade possui a regra de negócio que impede que o saldo fique negativo.
+
+A operação de ajuste é realizada pelo método:
+
+```text
+Produto.AjustarSaldo(delta)
+```
+
+A validação pertence ao domínio e não depende do banco de dados ou da camada HTTP.
+
+### 6.4 Persistência e Concorrência
+
+A persistência dos produtos é realizada pelo `repository`, utilizando GORM.
+
+O ajuste de saldo é executado dentro de uma transação e utiliza bloqueio pessimista:
+
+```sql
+SELECT ...
+FROM produtos
+WHERE codigo = ?
+FOR UPDATE;
+```
+
+Fluxo:
+
+```text
+Início da transação
+        ↓
+SELECT ... FOR UPDATE
+        ↓
+Produto bloqueado
+        ↓
+Produto.AjustarSaldo(delta)
+        ↓
+UPDATE
+        ↓
+COMMIT
+```
+
+O `FOR UPDATE` impede que operações concorrentes sobre o mesmo produto trabalhem simultaneamente sobre o mesmo estado do saldo.
+
+A regra de negócio permanece no domínio, enquanto o controle de transação, bloqueio e persistência permanece no repository.
 
 ---
 
@@ -266,9 +296,7 @@ Faturamento
 
 ## 7. API e Health Check
 
-Cada microsserviço disponibiliza um endpoint de Health Check.
-
-O endpoint verifica a disponibilidade da conexão com o PostgreSQL.
+Cada microsserviço disponibiliza um endpoint de Health Check que verifica a disponibilidade da conexão com o PostgreSQL.
 
 Quando a aplicação e o banco estão disponíveis, retorna HTTP 200.
 
@@ -303,8 +331,6 @@ GET /health
 ```text
 http://localhost:8081/health
 ```
-
-O Health Check permite verificar se o processo da API está ativo e respondendo às requisições HTTP.
 
 ---
 
@@ -342,9 +368,17 @@ O servidor de desenvolvimento utiliza a porta:
 - Angular inicializado;
 - Configuração por variáveis de ambiente;
 - Carregamento de `.env` para desenvolvimento local;
-- Validação das variáveis obrigatórias do Estoque;
-- Configuração encapsulada no microsserviço de Estoque;
+- Configuração do microsserviço de Estoque;
 - Conexão do Estoque com PostgreSQL utilizando GORM;
-- Validação da conexão com PostgreSQL;
-- Health Check do Estoque com verificação do banco.
+- Health Check do Estoque com verificação do banco;
+- Migration da tabela `produtos`;
+- Domínio `Produto`;
+- Regra de negócio para impedir saldo negativo;
+- Repository de produtos;
+- Criação e consulta de produtos;
+- Ajuste de saldo;
+- Tratamento de código duplicado e produto não encontrado;
+- Transação e bloqueio pessimista no ajuste de saldo;
+- Testes unitários do domínio;
+- Testes do repository.
 

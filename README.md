@@ -2,8 +2,8 @@
 
 Aplicação web composta por um frontend em Angular e dois microsserviços backend desenvolvidos em Go:
 
-- **Estoque** — responsável pelo controle de produtos e saldos.
-- **Faturamento** — responsável pela gestão das notas fiscais.
+* **Estoque** — responsável pelo controle de produtos e saldos.
+* **Faturamento** — responsável pela gestão das notas fiscais.
 
 Cada microsserviço possui seu próprio banco de dados PostgreSQL.
 
@@ -16,49 +16,49 @@ A solução utiliza uma arquitetura baseada em microsserviços:
                                               │     Angular      │
                                               │      :4200       │
                                               └────────┬─────────┘
-                                                        │
-                                          ┌─────────────┴─────────────┐
-                                          │                           │
-                                  ┌──────▼───────┐            ┌──────▼───────┐
-                                  │   Estoque    │            │ Faturamento  │
-                                  │    :8080     │            │    :8081     │
-                                  └──────┬───────┘            └──────┬───────┘
-                                          │                           │
-                                  ┌──────▼───────┐            ┌──────▼───────┐
-                                  │ PostgreSQL   │            │ PostgreSQL   │
-                                  │    :5433     │            │    :5434     │
-                                  └──────────────┘            └──────────────┘
+                                                       │
+                                         ┌─────────────┴─────────────┐
+                                         │                           │
+                                 ┌───────▼───────┐           ┌───────▼───────┐
+                                 │    Estoque    │           │  Faturamento  │
+                                 │     :8080     │           │     :8081     │
+                                 └───────┬───────┘           └───────┬───────┘
+                                         │                           │
+                                 ┌───────▼───────┐           ┌───────▼───────┐
+                                 │  PostgreSQL   │           │  PostgreSQL   │
+                                 │     :5433     │           │     :5434     │
+                                 └───────────────┘           └───────────────┘
 ```
 
 ## Tecnologias
 
 ### Frontend
 
-- Angular
-- TypeScript
-- SCSS
+* Angular
+* TypeScript
+* SCSS
 
 ### Backend
 
-- Go
-- Gin
-- GORM
+* Go
+* Gin
+* GORM
 
 ### Banco de dados
 
-- PostgreSQL 15
+* PostgreSQL 15
 
 ### Infraestrutura
 
-- Docker
-- Docker Compose
+* Docker
+* Docker Compose
 
 ## Pré-requisitos
 
-- Docker
-- Go 1.21+
-- Node.js
-- npm
+* Docker
+* Go 1.21+
+* Node.js
+* npm
 
 ## Estrutura
 
@@ -69,9 +69,19 @@ Korp_Teste_Dihann/
 │   │   ├── cmd/
 │   │   │   └── main.go
 │   │   ├── internal/
-│   │   │   ├── config/config.go
-│   │   │   └── database/database.go
+│   │   │   ├── config/
+│   │   │   │   └── config.go
+│   │   │   ├── database/
+│   │   │   │   └── database.go
+│   │   │   ├── domain/
+│   │   │   │   ├── produto.go
+│   │   │   │   └── produto_test.go
+│   │   │   └── repository/
+│   │   │       ├── produto_repository.go
+│   │   │       └── produto_repository_test.go
 │   │   ├── migrations/
+│   │   │   ├── 000001_create_produtos.up.sql
+│   │   │   └── 000001_create_produtos.down.sql
 │   │   ├── go.mod
 │   │   └── go.sum
 │   │
@@ -148,9 +158,9 @@ cd backend/estoque
 go run ./cmd
 ```
 
-**API:** [http://localhost:8080](http://localhost:8080)
+**API:** http://localhost:8080
 
-**Health Check:** [http://localhost:8080/health](http://localhost:8080/health)
+**Health Check:** http://localhost:8080/health
 
 ### Microsserviço de Faturamento
 
@@ -159,9 +169,9 @@ cd backend/faturamento
 go run ./cmd
 ```
 
-**API:** [http://localhost:8081](http://localhost:8081)
+**API:** http://localhost:8081
 
-**Health Check:** [http://localhost:8081/health](http://localhost:8081/health)
+**Health Check:** http://localhost:8081/health
 
 ### Frontend
 
@@ -171,20 +181,18 @@ npm install
 npm start
 ```
 
-**Aplicação:** [http://localhost:4200](http://localhost:4200)
+**Aplicação:** http://localhost:4200
 
 ## Portas
 
-
-| Serviço                | Porta  |
-| ---------------------- | ------ |
+| Serviço                |  Porta |
+| ---------------------- | -----: |
 | Angular                | `4200` |
 | Estoque API            | `8080` |
 | Faturamento API        | `8081` |
 | PostgreSQL Estoque     | `5433` |
 | PostgreSQL Faturamento | `5434` |
 
-
 ## Documentação Técnica
 
-O detalhamento da arquitetura, decisões técnicas, tecnologias utilizadas e implementação da solução está disponível em `[docs/detalhamento-tecnico.md](docs/detalhamento-tecnico.md)`.
+O detalhamento da arquitetura, decisões técnicas, tecnologias utilizadas e implementação da solução está disponível em [docs/detalhamento-tecnico.md](docs/detalhamento-tecnico.md).
