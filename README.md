@@ -1,15 +1,23 @@
-# Korp — Teste Técnico
+# raKorp — Sistema de Emissão de Notas Fiscais
 
-Aplicação web composta por um frontend em Angular e dois microsserviços backend desenvolvidos em Go:
+Teste técnico da Korp: sistema para cadastro de produtos, emissão de notas
+fiscais e controle de estoque, estruturado como uma arquitetura de
+microsserviços com frontend em Angular.
 
-- **Estoque** — responsável pelo controle de produtos e saldos.
-- **Faturamento** — responsável pela gestão das notas fiscais.
+## Visão geral
 
-Cada microsserviço possui seu próprio banco de dados PostgreSQL.
+
+| Módulo                                                 | Responsabilidade                          | Status             |
+| ------------------------------------------------------ | ----------------------------------------- | ------------------ |
+| `[backend/estoque](backend/estoque/README.md)`         | Cadastro de produtos e controle de saldo  | Completo           |
+| `[backend/faturamento](backend/faturamento/README.md)` | Emissão e gestão de notas fiscais         | Em desenvolvimento |
+| `[frontend](frontend/README.md)`                       | Telas Angular consumindo os dois serviços | Em desenvolvimento |
+
+
+Detalhamento técnico completo (ciclos de vida, bibliotecas, tratamento de
+erros, decisões de arquitetura): `[docs/detalhamento-tecnico.md](docs/detalhamento-tecnico.md)`.
 
 ## Arquitetura
-
-A solução utiliza uma arquitetura baseada em microsserviços:
 
 ```text
                                               ┌──────────────────┐
@@ -21,8 +29,8 @@ A solução utiliza uma arquitetura baseada em microsserviços:
                                          │                           │
                                  ┌───────▼───────┐           ┌───────▼───────┐
                                  │    Estoque    │           │  Faturamento  │
-                                 │     :8080     │           │     :8081     │
-                                 └───────┬───────┘           └───────┬───────┘
+                                 │     :8080     │◄──────────┤     :8081     │
+                                 └───────┬───────┘   HTTP    └───────┬───────┘
                                          │                           │
                                  ┌───────▼───────┐           ┌───────▼───────┐
                                  │  PostgreSQL   │           │  PostgreSQL   │
@@ -30,177 +38,49 @@ A solução utiliza uma arquitetura baseada em microsserviços:
                                  └───────────────┘           └───────────────┘
 ```
 
-## Tecnologias
-
-### Frontend
-
-- Angular
-- TypeScript
-- SCSS
-
-### Backend
-
-- Go
-- Gin
-- GORM
-
-### Banco de dados
-
-- PostgreSQL 15
-
-### Infraestrutura
-
-- Docker
-- Docker Compose
+Cada microsserviço é independente: código próprio, banco de dados próprio,
+ciclo de deploy próprio. O Faturamento se comunica com o Estoque via HTTP
+para consultar e baixar saldo no momento da impressão da nota.
 
 ## Pré-requisitos
 
-- Docker
+- Docker e Docker Compose
 - Go 1.21+
-- Node.js
-- npm
+- Node.js 18+ e npm
+- `[golang-migrate](https://github.com/golang-migrate/migrate)` (CLI, para rodar as migrations)
 
-## Estrutura
+## Subindo o ambiente completo
+
+```bash
+# 1. Configurar variáveis de ambiente
+cp .env.example .env
+
+# 2. Subir os bancos de dados
+docker compose up -d
+
+# 3. Rodar cada serviço (ver README específico de cada um para detalhes e migrations)
+cd backend/estoque && go run ./cmd        # :8080
+cd backend/faturamento && go run ./cmd    # :8081
+cd frontend && npm install && npm start   # :4200
+```
+
+Instruções detalhadas de configuração, migrations e testes de cada serviço
+estão nos READMEs específicos linkados na tabela acima.
+
+## Estrutura do repositório
 
 ```text
 Korp_Teste_Dihann/
 ├── backend/
-│   ├── estoque/
-│   │   ├── cmd/
-│   │   │   └── main.go
-│   │   ├── internal/
-│   │   │   ├── config/
-│   │   │   │   └── config.go
-│   │   │   ├── database/
-│   │   │   │   └── database.go
-│   │   │   ├── domain/
-│   │   │   │   ├── produto.go
-│   │   │   │   └── produto_test.go
-│   │   │   └── repository/
-│   │   │       ├── produto_repository.go
-│   │   │       └── produto_repository_test.go
-│   │   ├── migrations/
-│   │   │   ├── 000001_create_produtos.up.sql
-│   │   │   └── 000001_create_produtos.down.sql
-│   │   ├── go.mod
-│   │   └── go.sum
-│   │
-│   └── faturamento/
-│       ├── cmd/
-│       │   └── main.go
-│       ├── migrations/
-│       ├── go.mod
-│       └── go.sum
-│
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── app/
-│   │   ├── index.html
-│   │   └── main.ts
-│   ├── angular.json
-│   ├── package-lock.json
-│   ├── package.json
-│   └── tsconfig.json
-│
+│   ├── estoque/        → ver backend/estoque/README.md
+│   └── faturamento/     → ver backend/faturamento/README.md
+├── frontend/             → ver frontend/README.md
 ├── docs/
 │   └── detalhamento-tecnico.md
 ├── .env.example
-├── .gitignore
 ├── docker-compose.yml
-└── README.md
+└── README.md             (este arquivo)
 ```
-
-## Configuração
-
-Os microsserviços utilizam variáveis de ambiente para configuração.
-
-Cada serviço possui seu próprio conjunto de variáveis, utilizando prefixos para evitar conflitos:
-
-```text
-ESTOQUE_DB_*
-ESTOQUE_API_PORT
-
-FATURAMENTO_DB_*
-FATURAMENTO_API_PORT
-```
-
-O projeto disponibiliza o arquivo `.env.example` como referência para configuração do ambiente local.
-
-Em ambientes de produção, as mesmas variáveis devem ser fornecidas diretamente pela infraestrutura de execução, como Azure ou containers, sem necessidade de disponibilizar um arquivo `.env`.
-
-### Bancos de dados
-
-Os bancos PostgreSQL são executados localmente por meio do Docker Compose, em containers independentes, cada um associado a um microsserviço e a um volume persistente.
-
-Na raiz do projeto:
-
-```bash
-docker compose up -d
-```
-
-Para verificar os containers:
-
-```bash
-docker compose ps
-```
-
-Para interromper os containers:
-
-```bash
-docker compose down
-```
-
-### Microsserviço de Estoque
-
-#### Migrations
-
-As migrations do banco de dados são versionadas por microsserviço.
-
-Para executar as migrations do Estoque:
-
-```bash
-cd backend/estoque
-migrate -path migrations -database "postgres://<ESTOQUE_DB_USER>:<ESTOQUE_DB_PASSWORD>@<ESTOQUE_DB_HOST>:<ESTOQUE_DB_PORT>/<ESTOQUE_DB_NAME>?sslmode=disable" up
-```
-#### Testes
-
-Para executar os testes automatizados do Estoque:
-```bash
-go test ./... -v
-```
-Os testes do repository utilizam o PostgreSQL configurado no ambiente de desenvolvimento.
-
-#### Execução
-
-```bash
-go run ./cmd
-```
-
-**API:** [http://localhost:8080](http://localhost:8080)
-
-**Health Check:** [http://localhost:8080/health](http://localhost:8080/health)
-
-### Microsserviço de Faturamento
-
-```bash
-cd backend/faturamento
-go run ./cmd
-```
-
-**API:** [http://localhost:8081](http://localhost:8081)
-
-**Health Check:** [http://localhost:8081/health](http://localhost:8081/health)
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm start
-```
-
-**Aplicação:** [http://localhost:4200](http://localhost:4200)
 
 ## Portas
 
@@ -214,6 +94,3 @@ npm start
 | PostgreSQL Faturamento | `5434` |
 
 
-## Documentação Técnica
-
-O detalhamento da arquitetura, decisões técnicas, tecnologias utilizadas e implementação da solução está disponível em [docs/detalhamento-tecnico.md](docs/detalhamento-tecnico.md).

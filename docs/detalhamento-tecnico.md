@@ -1,22 +1,17 @@
 # Detalhamento Técnico
 
-## 1. Visão Geral
-
-Este documento apresenta o detalhamento técnico da solução desenvolvida para o teste técnico do Sistema de Emissão de Notas Fiscais.
-
-A aplicação foi estruturada utilizando:
-
-- Frontend em Angular;
-- Microsserviço de Estoque desenvolvido em Go;
-- Microsserviço de Faturamento desenvolvido em Go;
-- Um banco PostgreSQL independente para cada microsserviço;
-- Docker Compose para execução dos bancos de dados em ambiente local.
+Este documento responde, item a item, aos pontos de detalhamento técnico
+exigidos no enunciado do teste, explicando o **porquê** de cada decisão.
+Passo a passo de execução, endpoints e roteiros de teste estão nos
+READMEs de cada módulo (linkados ao longo deste documento).
 
 ---
 
-## 2. Arquitetura
+## 1. Visão Geral e Arquitetura
 
-A solução utiliza uma arquitetura baseada em microsserviços, com separação entre os domínios de Estoque e Faturamento.
+Arquitetura de microsserviços com dois serviços em Go (Estoque e
+Faturamento), cada um com seu próprio banco PostgreSQL, e um frontend em
+Angular consumindo ambos.
 
 ```text
                                               ┌──────────────────┐
@@ -28,9 +23,8 @@ A solução utiliza uma arquitetura baseada em microsserviços, com separação 
                                          │                           │
                                  ┌───────▼───────┐           ┌───────▼───────┐
                                  │    Estoque    │           │  Faturamento  │
-                                 │     :8080     │           │     :8081     │
-                                 │      Go       │           │      Go       │
-                                 └───────┬───────┘           └───────┬───────┘
+                                 │     :8080     │◄──────────┤     :8081     │
+                                 └───────┬───────┘   HTTP    └───────┬───────┘
                                          │                           │
                                  ┌───────▼───────┐           ┌───────▼───────┐
                                  │  PostgreSQL   │           │  PostgreSQL   │
@@ -38,347 +32,257 @@ A solução utiliza uma arquitetura baseada em microsserviços, com separação 
                                  └───────────────┘           └───────────────┘
 ```
 
+**Por que dois bancos separados:** cada microsserviço é dono exclusivo do
+seu schema. Isso evita acoplamento via banco compartilhado (uma mudança de
+schema no Estoque não pode quebrar o Faturamento) e reflete a
+independência de deploy que a arquitetura de microsserviços exige.
 
-
-### 2.1 Serviço de Estoque
-
-O serviço de Estoque é responsável pelo domínio de produtos e pelo controle de seus saldos.
-
-A implementação atual contempla:
-
-- configuração por variáveis de ambiente;
-- conexão com PostgreSQL utilizando GORM;
-- migration da tabela `produtos`;
-- entidade de domínio `Produto`;
-- regra de domínio para impedir saldo negativo;
-- repository para persistência de produtos;
-- criação de produtos;
-- busca de produto por código;
-- listagem de produtos;
-- ajuste de saldo;
-- tratamento de código de produto duplicado;
-- tratamento de produto não encontrado;
-- transação para alteração de saldo;
-- bloqueio pessimista com `FOR UPDATE`;
-- testes unitários do domínio;
-- testes do repository.
-
-**Porta:** `8080`
-
-**Health Check:** `GET /health`
-
-### 2.2 Serviço de Faturamento
-
-O serviço de Faturamento será responsável pelo domínio de notas fiscais.
-
-**Porta:** `8081`
-
-**Health Check:** `GET /health`
+Detalhes de execução de cada serviço:
+[`backend/estoque/README.md`](../backend/estoque/README.md) |
+`backend/faturamento/README.md` (em breve).
 
 ---
 
+## 2. Frontend (Angular)
 
+> Seção a ser preenchida conforme o frontend for implementado.
 
-## 3. Tecnologias
+### 2.1 Ciclos de vida do Angular utilizados
 
+*A preencher.*
 
+### 2.2 Uso da biblioteca RxJS
 
-### 3.1 Frontend
+*A preencher — indicar se houve uso (ex: `Observable` em chamadas HTTP,
+`Subject` para comunicação entre componentes, operadores como
+`switchMap`/`catchError`) e por quê.*
 
-- Angular
-- TypeScript
-- SCSS
+### 2.3 Outras bibliotecas utilizadas
 
-O frontend foi inicializado em Angular e será utilizado para implementar as telas e os fluxos do sistema.
+*A preencher.*
 
-### 3.2 Backend
+### 2.4 Bibliotecas de componentes visuais
 
-- Go
-- Gin
-- GORM
-
-Os microsserviços backend são desenvolvidos em Go utilizando Gin para criação das APIs HTTP e GORM para acesso ao banco de dados.
-
-### 3.3 Banco de Dados
-
-- PostgreSQL 15
-
-Foram configuradas duas instâncias independentes de PostgreSQL:
-
-
-| Microsserviço | Banco      | Porta  |
-| ------------- | ---------- | ------ |
-| Estoque       | PostgreSQL | `5433` |
-| Faturamento   | PostgreSQL | `5434` |
-
+*A preencher (ex: Angular Material, PrimeNG, ou componentes próprios).*
 
 ---
 
+## 3. Backend (Go)
 
+### 3.1 Gerenciamento de dependências
 
-## 4. Infraestrutura
+Go Modules (`go.mod` / `go.sum`), um módulo independente por
+microsserviço — cada serviço declara e versiona só as dependências que
+realmente usa, sem um `go.mod` compartilhado que acoplasse os dois
+serviços.
 
+### 3.2 Frameworks utilizados
 
+- **Gin** — roteamento HTTP e middlewares (logging, recovery).
+- **GORM** — ORM sobre PostgreSQL: queries, transações e locking.
 
-### 4.1 Docker Compose
+### 3.3 Tratamento de erros e exceções no backend
 
-O Docker Compose é utilizado para executar os bancos PostgreSQL em containers independentes.
+O tratamento de erros segue uma separação clara por camada:
 
-Cada banco possui:
+**Domínio** — regras de negócio retornam *sentinel errors* Go
+(`errors.New`), sem qualquer conhecimento de HTTP ou banco. Exemplo: a
+regra de saldo não pode ficar negativo vive em `Produto.AjustarSaldo`,
+que retorna `domain.ErrSaldoInsuficiente`. Isso permite testar a regra
+isoladamente, sem banco nem HTTP, e garante que ela vale independente de
+qual camada estiver chamando.
 
-- container próprio;
-- database próprio;
-- credenciais próprias;
-- porta própria;
-- volume persistente próprio.
-
-
-
-### 4.2 Persistência
-
-Cada banco possui um Docker Named Volume próprio:
-
-```text
-estoque_data
-faturamento_data
+```go
+func (p *Produto) AjustarSaldo(delta int) error {
+	novoSaldo := p.Saldo + delta
+	if novoSaldo < 0 {
+		return ErrSaldoInsuficiente
+	}
+	p.Saldo = novoSaldo
+	return nil
+}
 ```
 
-Os volumes permitem persistir os dados do PostgreSQL independentemente do ciclo de vida dos containers.
+**Repository** — traduz erros nativos de infraestrutura (driver do
+Postgres) para erros de domínio/aplicação. Em vez de fazer uma checagem
+prévia de duplicidade (que teria uma condição de corrida em cenário
+concorrente), o repository deixa a constraint `UNIQUE` do banco arbitrar
+e traduz o erro nativo do driver (`pgconn.PgError`, código `23505`) para
+`repository.ErrCodigoJaExiste`:
 
-A remoção dos volumes é uma operação separada e deve ser realizada explicitamente quando necessário.
+```go
+var pgErr *pgconn.PgError
+if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+	return ErrCodigoJaExiste
+}
+```
+
+**Validação de entrada (bind HTTP)** — o Gin usa `validator/v10` via tags
+de struct (`binding:"required"`, `binding:"gte=0"`) para rejeitar payload
+malformado antes de qualquer chamada ao service. O erro nativo do
+validator é traduzido para uma lista de erros por campo, em português,
+consumível diretamente pelo frontend (formato de resposta documentado em
+[`backend/estoque/README.md`](../backend/estoque/README.md#formato-de-erro)).
+
+**Handler** — ponto único de tradução erro → HTTP. A função
+`responderErro` centraliza todo o mapeamento: primeiro verifica se é erro
+de validação (`validator.ValidationErrors`), depois usa `errors.Is` para
+identificar erros de domínio/repository/service específicos e retornar o
+status correto:
+
+| Origem do erro | Status HTTP |
+|---|---|
+| `validator.ValidationErrors` (campo obrigatório/inválido) | `400` |
+| `repository.ErrProdutoNaoEncontrado` | `404` |
+| `repository.ErrCodigoJaExiste` | `409` |
+| `domain.ErrSaldoInsuficiente` | `422` |
+| Erros de validação de negócio do service | `400` |
+| Não mapeado / desconhecido | `400` (payload) |
+
+Centralizar essa tradução em um único ponto evita duplicar `switch`/`if`
+de mapeamento de erro em cada endpoint, e documenta o contrato de erros
+da API em um único lugar do código.
+
+**Panics inesperados** — capturados por `gin.CustomRecovery`, que loga o
+panic e responde `500` com JSON, garantindo que o processo nunca derruba
+por um erro não tratado (ex: nil pointer).
+
+**Health check como sinal de falha de dependência** — `/health` faz
+`Ping()` real no banco a cada chamada e retorna `503` se a conexão
+falhar, em vez de simplesmente responder `200` fixo. Isso é o que
+possibilita observar e testar o cenário obrigatório de falha de
+microsserviço (ver seção 7).
+
+### 3.4 Uso de LINQ / C#
+
+Não aplicável — a solução foi implementada inteiramente em Go, sem uso de
+C#.
 
 ---
 
+## 4. Domínio de Estoque
 
+A regra de saldo não-negativo vive no método `Produto.AjustarSaldo`, no
+**domínio** — não no repository nem no handler. Essa escolha é o que
+permite testar a regra de negócio isoladamente (ver
+`internal/domain/produto_test.go`), sem depender de banco de dados ou
+HTTP para validar o comportamento.
 
-## 5. Configuração
+Estrutura completa da entidade `Produto`:
+[`backend/estoque/README.md`](../backend/estoque/README.md#entidade-produto).
 
-A aplicação utiliza variáveis de ambiente para configuração dos microsserviços.
+### 4.1 Persistência e Concorrência
 
-Cada microsserviço possui seu próprio módulo de configuração, responsável por carregar e validar as variáveis necessárias.
-
-As variáveis são prefixadas de acordo com o microsserviço:
-
-```text
-ESTOQUE_DB_*
-ESTOQUE_API_PORT
-
-FATURAMENTO_DB_*
-FATURAMENTO_API_PORT
-```
-
-O projeto disponibiliza o arquivo `.env.example` como referência para configuração local.
-
-O arquivo `.env` não deve ser versionado.
-
-### 5.1 Desenvolvimento local
-
-Durante o desenvolvimento, o pacote `godotenv` é utilizado para carregar as variáveis definidas no arquivo `.env`.
-
-Fluxo:
-
-```text
-.env
- ↓
-godotenv.Load()
- ↓
-variáveis de ambiente
- ↓
-config.Load()
- ↓
-configuração da aplicação
-```
-
-
-
-### 5.2 Produção
-
-Em produção, as variáveis podem ser fornecidas diretamente pela infraestrutura de execução, como containers ou Azure App Service.
-
-Não é necessário disponibilizar um arquivo `.env`.
-
----
-
-
-
-## 6. Organização do Backend
-
-Cada microsserviço possui seu próprio módulo Go e gerencia suas próprias dependências.
-
-### 6.1 Gerenciamento de Dependências
-
-O backend utiliza Go Modules.
-
-Cada microsserviço possui:
-
-- `go.mod`;
-- `go.sum`.
-
-
-
-### 6.2 Conexão com Banco
-
-Cada microsserviço possui sua própria conexão com banco de dados:
-
-```text
-Estoque
-    └── internal/database
-            └── PostgreSQL do Estoque
-
-Faturamento
-    └── internal/database
-            └── PostgreSQL do Faturamento
-```
-
-
-
-### 6.3 Domínio de Estoque
-
-O domínio de Estoque possui a entidade `Produto`, responsável por representar um produto e seu saldo atual.
-
-
-| Campo       | Tipo        | Descrição                  |
-| ----------- | ----------- | -------------------------- |
-| `id`        | `uint`      | Identificador do produto   |
-| `codigo`    | `string`    | Código único do produto    |
-| `descricao` | `string`    | Descrição do produto       |
-| `saldo`     | `int`       | Saldo atual em estoque     |
-| `createdAt` | `time.Time` | Data de criação            |
-| `updatedAt` | `time.Time` | Data da última atualização |
-
-
-A entidade possui a regra de negócio que impede que o saldo fique negativo.
-
-A operação de ajuste é realizada pelo método:
-
-```text
-Produto.AjustarSaldo(delta)
-```
-
-A validação pertence ao domínio e não depende do banco de dados ou da camada HTTP.
-
-### 6.4 Persistência e Concorrência
-
-A persistência dos produtos é realizada pelo `repository`, utilizando GORM.
-
-O ajuste de saldo é executado dentro de uma transação e utiliza bloqueio pessimista:
+O ajuste de saldo roda dentro de uma transação com bloqueio pessimista:
 
 ```sql
-SELECT ...
-FROM produtos
-WHERE codigo = ?
-FOR UPDATE;
+SELECT ... FROM produtos WHERE codigo = ? FOR UPDATE;
 ```
-
-Fluxo:
 
 ```text
 Início da transação
         ↓
-SELECT ... FOR UPDATE
+SELECT ... FOR UPDATE      (bloqueia a linha do produto)
         ↓
-Produto bloqueado
-        ↓
-Produto.AjustarSaldo(delta)
+Produto.AjustarSaldo(delta)  (regra de domínio)
         ↓
 UPDATE
         ↓
-COMMIT
+COMMIT (libera o lock)
 ```
 
-O `FOR UPDATE` impede que operações concorrentes sobre o mesmo produto trabalhem simultaneamente sobre o mesmo estado do saldo.
+Isso serializa o acesso ao mesmo produto: se duas requisições tentarem
+baixar saldo do mesmo produto ao mesmo tempo, a segunda transação
+aguarda a primeira commitar antes de ler o saldo — eliminando a
+possibilidade de saldo negativo por condição de corrida.
 
-A regra de negócio permanece no domínio, enquanto o controle de transação, bloqueio e persistência permanece no repository.
+Validado manualmente com duas requisições simultâneas contra um produto
+de saldo `1`: uma responde `200`, a outra `422`, nunca as duas com
+sucesso. Passo a passo:
+[`backend/estoque/README.md`](../backend/estoque/README.md#teste-manual-de-concorrência).
 
 ---
 
+## 5. Infraestrutura
 
+### 5.1 Banco de dados
 
-## 7. API e Health Check
+PostgreSQL 15, uma instância por microsserviço, cada uma em container
+Docker independente com volume nomeado próprio (`estoque_data`,
+`faturamento_data`), garantindo persistência entre reinícios dos
+containers.
 
-Cada microsserviço disponibiliza um endpoint de Health Check que verifica a disponibilidade da conexão com o PostgreSQL.
+### 5.2 Migrations
 
-Quando a aplicação e o banco estão disponíveis, retorna HTTP 200.
+Schema versionado via `golang-migrate`, com arquivos `.up.sql`/`.down.sql`
+por microsserviço — permite aplicar/reverter mudanças de schema de forma
+controlada e rastreável, em vez de depender de `AutoMigrate` em runtime.
+Comandos: [`backend/estoque/README.md`](../backend/estoque/README.md#migrations).
 
-Quando a conexão com o banco não está disponível, retorna HTTP 503.
+### 5.3 Configuração
 
-### Estoque
-
-**Método:**
-
-```http
-GET /health
-```
-
-**Endpoint:**
-
-```text
-http://localhost:8080/health
-```
-
-
-
-### Faturamento
-
-**Método:**
-
-```http
-GET /health
-```
-
-**Endpoint:**
-
-```text
-http://localhost:8081/health
-```
+Variáveis de ambiente prefixadas por serviço (`ESTOQUE_*`,
+`FATURAMENTO_*`), carregadas via `godotenv` em desenvolvimento local; em
+produção, fornecidas diretamente pela infraestrutura de execução.
 
 ---
 
+## 6. Requisitos Opcionais Implementados
 
-
-## 8. Frontend Angular
-
-O frontend foi inicializado utilizando Angular.
-
-O servidor de desenvolvimento utiliza a porta:
-
-```text
-4200
-```
+- **Tratamento de concorrência:** lock pessimista (`SELECT ... FOR
+  UPDATE`) descrito na seção 4.1, validado manualmente.
+- **Idempotência:** *a definir conforme implementação no Faturamento.*
+- **Uso de IA:** *a definir.*
 
 ---
 
+## 7. Requisito Obrigatório: Tratamento de Falhas
 
+O cenário de falha de microsserviço é observável e testável através do
+`/health` de cada serviço, que verifica a conexão real com o banco
+(`sqlDB.Ping()`) a cada chamada, em vez de responder `200` fixo:
 
-## Estado Atual da Implementação
+- Banco disponível → `200 {"status":"ok","database":"up"}`
+- Banco indisponível → `503 {"status":"error","database":"down"}`
 
+A aplicação se recupera sozinha assim que a conexão volta a responder,
+sem necessidade de reiniciar o processo. Passo a passo de validação:
+[`backend/estoque/README.md`](../backend/estoque/README.md#teste-de-falha-do-banco).
 
+O feedback ao usuário final (frontend) e o cenário de falha na
+comunicação entre Faturamento → Estoque durante a emissão de nota serão
+detalhados na seção do Faturamento, quando implementados.
 
-### Implementado
+---
 
-- Estrutura inicial do projeto;
-- Arquitetura baseada em microsserviços;
-- Microsserviço de Estoque;
-- Estrutura inicial do microsserviço de Faturamento;
-- Docker Compose;
-- PostgreSQL do Estoque;
-- PostgreSQL do Faturamento;
-- Volumes persistentes;
-- Go Modules;
-- Angular inicializado;
-- Configuração por variáveis de ambiente;
-- Carregamento de `.env` para desenvolvimento local;
-- Configuração do microsserviço de Estoque;
-- Conexão do Estoque com PostgreSQL utilizando GORM;
-- Health Check do Estoque com verificação do banco;
-- Migration da tabela `produtos`;
-- Domínio `Produto`;
-- Regra de negócio para impedir saldo negativo;
-- Repository de produtos;
-- Criação e consulta de produtos;
-- Ajuste de saldo;
-- Tratamento de código duplicado e produto não encontrado;
-- Transação e bloqueio pessimista no ajuste de saldo;
-- Testes unitários do domínio;
-- Testes do repository.
+## 8. Metodologia de Testes
 
+- **Automatizados** (`go test ./... -v`): unitários de domínio (sem
+  infraestrutura) e de integração de repository (contra PostgreSQL
+  real).
+- **Manuais**: roteiro end-to-end (handler → service → repository →
+  banco), cobrindo casos de erro, persistência entre reinícios,
+  concorrência e falha de banco. Roteiro completo:
+  [`backend/estoque/README.md`](../backend/estoque/README.md#roteiro-de-testes-manuais).
+
+---
+
+## 9. Estado Atual da Implementação
+
+### Concluído
+
+- Arquitetura de microsserviços (Estoque + Faturamento) com bancos
+  independentes;
+- Serviço de Estoque completo: domínio, repository, service, handler,
+  validação de payload, tratamento de erros centralizado, testes
+  automatizados e roteiro de testes manuais (18 cenários + concorrência)
+  validados;
+- Migrations versionadas do Estoque;
+- Health check com verificação real de banco, validado em cenário de
+  falha e recuperação.
+
+### Em andamento
+
+- Serviço de Faturamento (numeração sequencial, status Aberta/Fechada,
+  integração HTTP com Estoque, cenário de falha e recuperação);
+- Frontend Angular (telas de cadastro, listagem e impressão de notas).
