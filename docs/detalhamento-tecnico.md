@@ -201,6 +201,90 @@ de saldo `1`: uma responde `200`, a outra `422`, nunca as duas com
 sucesso. Passo a passo:
 [`backend/estoque/README.md`](../backend/estoque/README.md#teste-manual-de-concorrência).
 
+## 4.2 Domínio de Faturamento
+
+### 4.2.1 Entidades
+
+`NotaFiscal` possui `numero` (numeração fiscal, exposta ao usuário) e
+`id` (chave técnica) como campos deliberadamente separados, cada um
+gerado por sua própria sequência no Postgres. Isso desacopla a
+numeração sequencial exigida pelo enunciado de detalhes de
+implementação da chave primária — se o schema precisar mudar no
+futuro (ex: chave técnica virar UUID), a sequência de `numero`
+continua intacta.
+
+`ItemNotaFiscal` referencia a nota via chave estrangeira com
+`ON DELETE CASCADE`, e tem `quantidade > 0` reforçado tanto no domínio
+quanto por `CHECK` constraint no banco — mesma filosofia de dupla
+camada de validação aplicada no Estoque.
+
+### 4.2.2 Regras de negócio no domínio
+
+Assim como em `Produto.AjustarSaldo` no Estoque, as regras de transição
+de estado da nota vivem inteiramente no domínio, sem dependência de
+banco ou HTTP:
+
+```go
+func (n *NotaFiscal) AdicionarItem(produtoCodigo string, quantidade int) error {
+	if n.Status != StatusAberta {
+		return ErrNotaNaoAberta
+	}
+	// ... validações de produtoCodigo e quantidade
+}
+
+func (n *NotaFiscal) PodeSerImpressa() error {
+	if n.Status != StatusAberta {
+		return ErrNotaNaoAberta
+	}
+	if len(n.Itens) == 0 {
+		return ErrSemItens
+	}
+	return nil
+}
+```
+
+Uma decisão específica do Faturamento: `Fechar()` retorna `error` e
+recusa fechar uma nota que não esteja `ABERTA`, em vez de ser uma
+operação incondicional. Isso obriga qualquer código chamador (o
+`service`, quando implementado) a lidar explicitamente com esse
+retorno — reduzindo a chance de a nota ser fechada duas vezes por
+engano em um fluxo com múltiplas etapas assíncronas.
+
+### 4.2.3 Numeração sequencial
+
+```sql
+CREATE SEQUENCE IF NOT EXISTS notas_fiscais_numero_seq
+    START WITH 1
+    INCREMENT BY 1;
+
+CREATE TABLE notas_fiscais (
+    id BIGSERIAL PRIMARY KEY,
+    numero BIGINT NOT NULL UNIQUE
+        DEFAULT nextval('notas_fiscais_numero_seq'),
+    ...
+);
+```
+
+O número é atribuído atomicamente pelo Postgres no momento do insert,
+eliminando qualquer possibilidade de duas notas concorrentes
+receberem o mesmo número — o mesmo princípio de "deixar o banco
+arbitrar" usado na constraint `UNIQUE` de código de produto no
+Estoque (seção 3.3), aplicado agora a uma sequência em vez de uma
+constraint de unicidade simples.
+
+### 4.2.4 Persistência
+
+`AtualizarStatus` faz um `UPDATE` direcionado apenas na coluna
+`status`, em vez de `Save()` no struct completo — evita que o GORM
+dispare upsert das associações (`Itens`) só porque elas estão
+carregadas em memória no momento da chamada. Validado por teste de
+integração dedicado (`TestNotaFiscalRepository_AtualizarStatusNaoAlteraItens`)
+que confirma que os itens permanecem intactos após uma atualização de
+status.
+
+Detalhes de execução, schema completo e testes:
+[`backend/faturamento/README.md`](../backend/faturamento/README.md).
+
 ---
 
 ## 5. Infraestrutura
@@ -224,6 +308,15 @@ Comandos: [`backend/estoque/README.md`](../backend/estoque/README.md#migrations)
 Variáveis de ambiente prefixadas por serviço (`ESTOQUE_*`,
 `FATURAMENTO_*`), carregadas via `godotenv` em desenvolvimento local; em
 produção, fornecidas diretamente pela infraestrutura de execução.
+
+Os dois serviços divergem propositalmente na política de ausência de
+variável: o Estoque aplica um valor padrão (`getEnv` com fallback), o
+Faturamento falha imediatamente na inicialização (`requiredEnv` com
+`log.Fatalf`). Essa segunda abordagem foi escolhida para o Faturamento
+porque ele depende de uma variável crítica adicional
+(`ESTOQUE_SERVICE_URL`) cuja ausência silenciosa levaria a um erro
+difícil de diagnosticar só na hora da impressão da nota — preferimos que
+o processo nem suba se a configuração estiver incompleta.
 
 ---
 
@@ -278,11 +371,16 @@ detalhados na seção do Faturamento, quando implementados.
   automatizados e roteiro de testes manuais (18 cenários + concorrência)
   validados;
 - Migrations versionadas do Estoque;
-- Health check com verificação real de banco, validado em cenário de
-  falha e recuperação.
+- Health check do Estoque com verificação real de banco, validado em
+  cenário de falha e recuperação;
+- Faturamento: configuração, conexão com banco, domínio `NotaFiscal`
+  (regras de status e itens), migrations (incluindo sequência própria
+  de numeração fiscal) e repository, todos com testes automatizados
+  (unitários de domínio + integração de repository).
 
 ### Em andamento
 
-- Serviço de Faturamento (numeração sequencial, status Aberta/Fechada,
-  integração HTTP com Estoque, cenário de falha e recuperação);
+- Faturamento: cliente HTTP de integração com o Estoque, service com
+  orquestração de impressão e compensação automática em caso de falha
+  de comunicação, handler e exposição da API HTTP;
 - Frontend Angular (telas de cadastro, listagem e impressão de notas).

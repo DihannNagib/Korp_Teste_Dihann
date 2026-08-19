@@ -14,10 +14,11 @@ type Config struct {
 	DBPassword string
 	DBName string
 	ServerPort string
+	EstoqueServiceURL string
 }
 
-func Load() *Config {
-	if err := godotenv.Load("../../.env"); err != nil {
+func Load(envFile string) *Config {
+	if err := godotenv.Load(envFile); err != nil {
 		log.Printf(".env não encontrado; usando variáveis de ambiente")
 	}
 
@@ -28,6 +29,7 @@ func Load() *Config {
 		DBPassword: requiredEnv("FATURAMENTO_DB_PASSWORD"),
 		DBName: requiredEnv("FATURAMENTO_DB_NAME"),
 		ServerPort: requiredEnv("FATURAMENTO_API_PORT"),
+		EstoqueServiceURL: requiredEnv("ESTOQUE_SERVICE_URL"),
 	}
 }
 
