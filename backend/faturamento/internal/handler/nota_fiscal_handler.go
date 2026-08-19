@@ -179,7 +179,23 @@ func responderErro(
 			},
 		)
 
-	case errors.Is(err, service.ErrBaixaEstoque):
+	case errors.Is(err, service.ErrSaldoInsuficienteEstoque):
+		c.JSON(
+			http.StatusUnprocessableEntity,
+			gin.H{
+				"erro": err.Error(),
+			},
+		)
+
+	case errors.Is(err, service.ErrProdutoNaoEncontradoEstoque):
+		c.JSON(
+			http.StatusNotFound,
+			gin.H{
+				"erro": err.Error(),
+			},
+		)
+
+	case errors.Is(err, service.ErrFalhaComunicacaoEstoque):
 		c.JSON(
 			http.StatusServiceUnavailable,
 			gin.H{

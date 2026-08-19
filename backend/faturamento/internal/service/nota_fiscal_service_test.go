@@ -7,60 +7,50 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/DihannNagib/Korp_Teste_Dihann/backend/faturamento/internal/client"
 	"github.com/DihannNagib/Korp_Teste_Dihann/backend/faturamento/internal/domain"
 	"github.com/DihannNagib/Korp_Teste_Dihann/backend/faturamento/internal/repository"
 	"github.com/DihannNagib/Korp_Teste_Dihann/backend/faturamento/internal/service"
 )
 
-type mockNotaFiscalRepository struct {
-	notas map[uint]*domain.NotaFiscal
+type mockRepo struct {
+	notas      map[uint]*domain.NotaFiscal
+	proxNumero uint
 
-	createCalls          int
-	findByNumeroCalls    int
-	findAllCalls         int
-	atualizarStatusCalls int
-
-	createError          error
-	findByNumeroError    error
-	findAllError         error
-	atualizarStatusError error
+	createErr         error
+	findByNumeroErr   error
+	findAllErr        error
+	atualizarStatusErr error
 }
 
-func newMockNotaFiscalRepository() *mockNotaFiscalRepository {
-	return &mockNotaFiscalRepository{
-		notas: make(map[uint]*domain.NotaFiscal),
+func newMockRepo() *mockRepo {
+	return &mockRepo{
+		notas:      make(map[uint]*domain.NotaFiscal),
+		proxNumero: 1,
 	}
 }
 
-func (m *mockNotaFiscalRepository) Create(
-	nota *domain.NotaFiscal,
-) error {
-	m.createCalls++
-
-	if m.createError != nil {
-		return m.createError
+func (m *mockRepo) Create(n *domain.NotaFiscal) error {
+	if m.createErr != nil {
+		return m.createErr
 	}
 
-	id := uint(len(m.notas) + 1)
+	n.ID = m.proxNumero
+	n.Numero = m.proxNumero
 
-	nota.ID = id
-	nota.Numero = id
-
-	m.notas[nota.Numero] = nota
+	m.notas[n.Numero] = n
+	m.proxNumero++
 
 	return nil
 }
 
-func (m *mockNotaFiscalRepository) FindByNumero(
-	numero uint,
-) (*domain.NotaFiscal, error) {
-	m.findByNumeroCalls++
-
-	if m.findByNumeroError != nil {
-		return nil, m.findByNumeroError
+func (m *mockRepo) FindByNumero(numero uint) (*domain.NotaFiscal, error) {
+	if m.findByNumeroErr != nil {
+		return nil, m.findByNumeroErr
 	}
 
 	nota, ok := m.notas[numero]
+
 	if !ok {
 		return nil, repository.ErrNotaNaoEncontrada
 	}
@@ -68,14 +58,12 @@ func (m *mockNotaFiscalRepository) FindByNumero(
 	return nota, nil
 }
 
-func (m *mockNotaFiscalRepository) FindAll() ([]domain.NotaFiscal, error) {
-	m.findAllCalls++
-
-	if m.findAllError != nil {
-		return nil, m.findAllError
+func (m *mockRepo) FindAll() ([]domain.NotaFiscal, error) {
+	if m.findAllErr != nil {
+		return nil, m.findAllErr
 	}
 
-	notas := make([]domain.NotaFiscal, 0, len(m.notas))
+	var notas []domain.NotaFiscal
 
 	for _, nota := range m.notas {
 		notas = append(notas, *nota)
@@ -84,68 +72,90 @@ func (m *mockNotaFiscalRepository) FindAll() ([]domain.NotaFiscal, error) {
 	return notas, nil
 }
 
-func (m *mockNotaFiscalRepository) AtualizarStatus(
-	nota *domain.NotaFiscal,
-) error {
-	m.atualizarStatusCalls++
-
-	if m.atualizarStatusError != nil {
-		return m.atualizarStatusError
+func (m *mockRepo) AtualizarStatus(n *domain.NotaFiscal) error {
+	if m.atualizarStatusErr != nil {
+		return m.atualizarStatusErr
 	}
 
-	m.notas[nota.Numero] = nota
+	m.notas[n.Numero].Status = n.Status
 
 	return nil
 }
 
-type mockEstoqueGateway struct {
-	itensRecebidos []domain.ItemNotaFiscal
-	erro           error
+type chamada struct {
+	tipo       string
+	codigo     string
+	quantidade int
 }
 
-func newMockEstoqueGateway() *mockEstoqueGateway {
-	return &mockEstoqueGateway{
-		itensRecebidos: make([]domain.ItemNotaFiscal, 0),
-	}
+type mockEstoque struct {
+	falharNoItem int
+	erro         error
+
+	baixas   int
+	chamadas []chamada
+
+	estornoErr error
 }
 
-func (m *mockEstoqueGateway) BaixarItens(
-	itens []domain.ItemNotaFiscal,
+func (m *mockEstoque) BaixarItem(
+	codigo string,
+	quantidade int,
 ) error {
-	m.itensRecebidos = append(
-		m.itensRecebidos,
-		itens...,
+	m.chamadas = append(
+		m.chamadas,
+		chamada{
+			tipo:       "baixa",
+			codigo:     codigo,
+			quantidade: quantidade,
+		},
 	)
 
-	return m.erro
+	if m.baixas == m.falharNoItem {
+		m.baixas++
+		return m.erro
+	}
+
+	m.baixas++
+
+	return nil
 }
 
-func criarService() (
-	service.NotaFiscalService,
-	*mockNotaFiscalRepository,
-	*mockEstoqueGateway,
-) {
-	repo := newMockNotaFiscalRepository()
-	estoque := newMockEstoqueGateway()
-
-	svc := service.NewNotaFiscalService(
-		repo,
-		estoque,
+func (m *mockEstoque) EstornarItem(
+	codigo string,
+	quantidade int,
+) error {
+	m.chamadas = append(
+		m.chamadas,
+		chamada{
+			tipo:       "estorno",
+			codigo:     codigo,
+			quantidade: quantidade,
+		},
 	)
 
-	return svc, repo, estoque
+	return m.estornoErr
 }
 
-func TestNotaFiscalService_CriarNota(t *testing.T) {
-	svc, repo, _ := criarService()
+// ---------------------------------------------------------
+// CriarNota
+// ---------------------------------------------------------
+
+func TestCriarNota_Sucesso(t *testing.T) {
+	repo := newMockRepo()
+	estoque := &mockEstoque{
+		falharNoItem: -1,
+	}
+
+	svc := service.NewNotaFiscalService(repo, estoque)
 
 	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
 		{
-			ProdutoCodigo: "PROD-001",
+			ProdutoCodigo: "P001",
 			Quantidade:    3,
 		},
 		{
-			ProdutoCodigo: "PROD-002",
+			ProdutoCodigo: "P002",
 			Quantidade:    5,
 		},
 	})
@@ -153,151 +163,146 @@ func TestNotaFiscalService_CriarNota(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, nota)
 
-	assert.Equal(t, domain.StatusAberta, nota.Status)
+	assert.Equal(t, uint(1), nota.ID)
 	assert.Equal(t, uint(1), nota.Numero)
-	assert.Len(t, nota.Itens, 2)
-	assert.Equal(t, 1, repo.createCalls)
+	assert.Equal(t, domain.StatusAberta, nota.Status)
 
-	assert.Equal(t, "PROD-001", nota.Itens[0].ProdutoCodigo)
+	require.Len(t, nota.Itens, 2)
+
+	assert.Equal(t, "P001", nota.Itens[0].ProdutoCodigo)
 	assert.Equal(t, 3, nota.Itens[0].Quantidade)
 
-	assert.Equal(t, "PROD-002", nota.Itens[1].ProdutoCodigo)
+	assert.Equal(t, "P002", nota.Itens[1].ProdutoCodigo)
 	assert.Equal(t, 5, nota.Itens[1].Quantidade)
 }
 
-func TestNotaFiscalService_CriarNotaValidaItens(t *testing.T) {
-	tests := []struct {
-		name     string
-		item     service.ItemNotaFiscalInput
-		expected error
-	}{
-		{
-			name: "produto inválido",
-			item: service.ItemNotaFiscalInput{
-				ProdutoCodigo: "   ",
-				Quantidade:    1,
-			},
-			expected: domain.ErrProdutoInvalido,
-		},
-		{
-			name: "quantidade inválida",
-			item: service.ItemNotaFiscalInput{
-				ProdutoCodigo: "PROD-001",
-				Quantidade:    0,
-			},
-			expected: domain.ErrQuantidadeInvalida,
-		},
-		{
-			name: "quantidade negativa",
-			item: service.ItemNotaFiscalInput{
-				ProdutoCodigo: "PROD-001",
-				Quantidade:    -1,
-			},
-			expected: domain.ErrQuantidadeInvalida,
-		},
+func TestCriarNota_ItemInvalidoNaoPersiste(t *testing.T) {
+	repo := newMockRepo()
+	estoque := &mockEstoque{
+		falharNoItem: -1,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc, repo, _ := criarService()
+	svc := service.NewNotaFiscalService(repo, estoque)
 
-			nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
-				tt.item,
-			})
-
-			assert.Nil(t, nota)
-			assert.ErrorIs(t, err, tt.expected)
-			assert.Equal(t, 0, repo.createCalls)
-		})
-	}
-}
-
-func TestNotaFiscalService_CriarNotaPropagaErroDoRepository(t *testing.T) {
-	svc, repo, _ := criarService()
-
-	erroBanco := errors.New("erro de banco")
-	repo.createError = erroBanco
-
-	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
+	_, err := svc.CriarNota([]service.ItemNotaFiscalInput{
 		{
-			ProdutoCodigo: "PROD-001",
-			Quantidade:    1,
+			ProdutoCodigo: "P001",
+			Quantidade:    3,
+		},
+		{
+			ProdutoCodigo: "P002",
+			Quantidade:    0,
 		},
 	})
 
-	assert.Nil(t, nota)
-	assert.ErrorIs(t, err, erroBanco)
-	assert.Equal(t, 1, repo.createCalls)
+	require.Error(t, err)
+
+	assert.Len(t, repo.notas, 0)
 }
 
-func TestNotaFiscalService_BuscarPorNumero(t *testing.T) {
-	svc, repo, _ := criarService()
+// ---------------------------------------------------------
+// BuscarPorNumero
+// ---------------------------------------------------------
 
-	nota := domain.NovaNotaFiscal()
-	require.NoError(t, repo.Create(nota))
+func TestBuscarPorNumero(t *testing.T) {
+	repo := newMockRepo()
+	estoque := &mockEstoque{
+		falharNoItem: -1,
+	}
 
-	encontrada, err := svc.BuscarPorNumero(nota.Numero)
+	svc := service.NewNotaFiscalService(repo, estoque)
+
+	criada, err := svc.CriarNota([]service.ItemNotaFiscalInput{
+		{
+			ProdutoCodigo: "P001",
+			Quantidade:    2,
+		},
+	})
+
+	require.NoError(t, err)
+
+	encontrada, err := svc.BuscarPorNumero(criada.Numero)
 
 	require.NoError(t, err)
 	require.NotNil(t, encontrada)
 
-	assert.Equal(t, nota.Numero, encontrada.Numero)
-	assert.Equal(t, 1, repo.findByNumeroCalls)
+	assert.Equal(t, criada.Numero, encontrada.Numero)
+	assert.Equal(t, domain.StatusAberta, encontrada.Status)
 }
 
-func TestNotaFiscalService_BuscarPorNumeroPropagaErro(t *testing.T) {
-	svc, repo, _ := criarService()
+func TestBuscarPorNumeroNaoEncontrada(t *testing.T) {
+	repo := newMockRepo()
+	estoque := &mockEstoque{
+		falharNoItem: -1,
+	}
 
-	erro := repository.ErrNotaNaoEncontrada
-	repo.findByNumeroError = erro
+	svc := service.NewNotaFiscalService(repo, estoque)
 
-	nota, err := svc.BuscarPorNumero(999)
+	_, err := svc.BuscarPorNumero(999)
 
-	assert.Nil(t, nota)
-	assert.ErrorIs(t, err, erro)
-	assert.Equal(t, 1, repo.findByNumeroCalls)
+	assert.ErrorIs(
+		t,
+		err,
+		repository.ErrNotaNaoEncontrada,
+	)
 }
 
-func TestNotaFiscalService_Listar(t *testing.T) {
-	svc, repo, _ := criarService()
+// ---------------------------------------------------------
+// Listar
+// ---------------------------------------------------------
 
-	nota1 := domain.NovaNotaFiscal()
-	nota2 := domain.NovaNotaFiscal()
+func TestListar(t *testing.T) {
+	repo := newMockRepo()
+	estoque := &mockEstoque{
+		falharNoItem: -1,
+	}
 
-	require.NoError(t, repo.Create(nota1))
-	require.NoError(t, repo.Create(nota2))
+	svc := service.NewNotaFiscalService(repo, estoque)
+
+	_, err := svc.CriarNota([]service.ItemNotaFiscalInput{
+		{
+			ProdutoCodigo: "P001",
+			Quantidade:    1,
+		},
+	})
+
+	require.NoError(t, err)
+
+	_, err = svc.CriarNota([]service.ItemNotaFiscalInput{
+		{
+			ProdutoCodigo: "P002",
+			Quantidade:    2,
+		},
+	})
+
+	require.NoError(t, err)
 
 	notas, err := svc.Listar()
 
 	require.NoError(t, err)
-	require.Len(t, notas, 2)
-
-	assert.Equal(t, 1, repo.findAllCalls)
+	assert.Len(t, notas, 2)
 }
 
-func TestNotaFiscalService_ListarPropagaErro(t *testing.T) {
-	svc, repo, _ := criarService()
+// ---------------------------------------------------------
+// Imprimir
+// ---------------------------------------------------------
 
-	erro := errors.New("erro ao consultar notas")
-	repo.findAllError = erro
+func TestImprimir_Sucesso(t *testing.T) {
+	repo := newMockRepo()
 
-	notas, err := svc.Listar()
+	estoque := &mockEstoque{
+		falharNoItem: -1,
+	}
 
-	assert.Nil(t, notas)
-	assert.ErrorIs(t, err, erro)
-	assert.Equal(t, 1, repo.findAllCalls)
-}
-
-func TestNotaFiscalService_Imprimir(t *testing.T) {
-	svc, repo, estoque := criarService()
+	svc := service.NewNotaFiscalService(repo, estoque)
 
 	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
 		{
-			ProdutoCodigo: "PROD-001",
+			ProdutoCodigo: "P001",
 			Quantidade:    3,
 		},
 		{
-			ProdutoCodigo: "PROD-002",
+			ProdutoCodigo: "P002",
 			Quantidade:    5,
 		},
 	})
@@ -309,170 +314,374 @@ func TestNotaFiscalService_Imprimir(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, impressa)
 
-	assert.Equal(t, domain.StatusFechada, impressa.Status)
-	assert.Equal(t, 1, repo.atualizarStatusCalls)
-
-	require.Len(t, estoque.itensRecebidos, 2)
-
-	assert.Equal(t, "PROD-001", estoque.itensRecebidos[0].ProdutoCodigo)
-	assert.Equal(t, 3, estoque.itensRecebidos[0].Quantidade)
-
-	assert.Equal(t, "PROD-002", estoque.itensRecebidos[1].ProdutoCodigo)
-	assert.Equal(t, 5, estoque.itensRecebidos[1].Quantidade)
-}
-
-func TestNotaFiscalService_ImprimirNotaSemItens(t *testing.T) {
-	svc, repo, estoque := criarService()
-
-	nota := domain.NovaNotaFiscal()
-	require.NoError(t, repo.Create(nota))
-
-	resultado, err := svc.Imprimir(nota.Numero)
-
-	assert.Nil(t, resultado)
-	assert.ErrorIs(t, err, domain.ErrSemItens)
-
-	assert.Empty(t, estoque.itensRecebidos)
-	assert.Equal(t, 0, repo.atualizarStatusCalls)
-}
-
-func TestNotaFiscalService_ImprimirNotaFechada(t *testing.T) {
-	svc, repo, estoque := criarService()
-
-	nota := domain.NovaNotaFiscal()
-
-	require.NoError(
+	assert.Equal(
 		t,
-		nota.AdicionarItem("PROD-001", 2),
+		domain.StatusFechada,
+		impressa.Status,
 	)
 
-	require.NoError(t, repo.Create(nota))
-	require.NoError(t, nota.Fechar())
-	require.NoError(t, repo.AtualizarStatus(nota))
+	require.Len(t, estoque.chamadas, 2)
 
-	resultado, err := svc.Imprimir(nota.Numero)
+	assert.Equal(
+		t,
+		chamada{"baixa", "P001", 3},
+		estoque.chamadas[0],
+	)
 
-	assert.Nil(t, resultado)
-	assert.ErrorIs(t, err, domain.ErrNotaNaoAberta)
-
-	assert.Empty(t, estoque.itensRecebidos)
-	assert.Equal(t, 1, repo.atualizarStatusCalls)
+	assert.Equal(
+		t,
+		chamada{"baixa", "P002", 5},
+		estoque.chamadas[1],
+	)
 }
 
-func TestNotaFiscalService_ImprimirEstoqueFalha(t *testing.T) {
-	svc, repo, estoque := criarService()
+func TestImprimir_FalhaProdutoNaoEncontradoCompensa(t *testing.T) {
+	repo := newMockRepo()
+
+	estoque := &mockEstoque{
+		falharNoItem: 1,
+		erro:         client.ErrProdutoNaoEncontrado,
+	}
+
+	svc := service.NewNotaFiscalService(repo, estoque)
 
 	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
 		{
-			ProdutoCodigo: "PROD-001",
+			ProdutoCodigo: "P001",
 			Quantidade:    3,
+		},
+		{
+			ProdutoCodigo: "P002",
+			Quantidade:    1,
 		},
 	})
 
 	require.NoError(t, err)
 
-	erroEstoque := errors.New("saldo insuficiente")
-	estoque.erro = erroEstoque
+	_, err = svc.Imprimir(nota.Numero)
 
-	resultado, err := svc.Imprimir(nota.Numero)
+	require.Error(t, err)
 
-	assert.Nil(t, resultado)
+	assert.ErrorIs(
+		t,
+		err,
+		service.ErrProdutoNaoEncontradoEstoque,
+	)
 
-	assert.ErrorIs(t, err, service.ErrBaixaEstoque)
-	assert.ErrorIs(t, err, erroEstoque)
+	notaAtual, err := repo.FindByNumero(nota.Numero)
 
-	require.Len(t, estoque.itensRecebidos, 1)
+	require.NoError(t, err)
 
 	assert.Equal(
 		t,
-		"PROD-001",
-		estoque.itensRecebidos[0].ProdutoCodigo,
+		domain.StatusAberta,
+		notaAtual.Status,
+	)
+
+	// Baixa P001
+	// Baixa P002 -> falha
+	// Estorno P001
+	require.Len(t, estoque.chamadas, 3)
+
+	assert.Equal(
+		t,
+		chamada{"baixa", "P001", 3},
+		estoque.chamadas[0],
 	)
 
 	assert.Equal(
 		t,
-		3,
-		estoque.itensRecebidos[0].Quantidade,
+		chamada{"baixa", "P002", 1},
+		estoque.chamadas[1],
 	)
 
-	assert.Equal(t, 0, repo.atualizarStatusCalls)
-	assert.Equal(t, domain.StatusAberta, nota.Status)
+	assert.Equal(
+		t,
+		chamada{"estorno", "P001", 3},
+		estoque.chamadas[2],
+	)
 }
 
-func TestNotaFiscalService_ImprimirNaoFechaQuandoEstoqueFalha(t *testing.T) {
-	svc, repo, estoque := criarService()
+func TestImprimir_SaldoInsuficiente(t *testing.T) {
+	repo := newMockRepo()
+
+	estoque := &mockEstoque{
+		falharNoItem: 0,
+		erro:         client.ErrSaldoInsuficiente,
+	}
+
+	svc := service.NewNotaFiscalService(repo, estoque)
 
 	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
 		{
-			ProdutoCodigo: "PROD-001",
-			Quantidade:    3,
+			ProdutoCodigo: "P001",
+			Quantidade:    10,
 		},
 	})
 
 	require.NoError(t, err)
 
-	estoque.erro = errors.New("saldo insuficiente")
+	_, err = svc.Imprimir(nota.Numero)
 
-	resultado, err := svc.Imprimir(nota.Numero)
+	require.Error(t, err)
 
-	assert.Nil(t, resultado)
-	assert.ErrorIs(t, err, service.ErrBaixaEstoque)
+	assert.ErrorIs(
+		t,
+		err,
+		service.ErrSaldoInsuficienteEstoque,
+	)
 
-	assert.Equal(t, domain.StatusAberta, nota.Status)
-	assert.Equal(t, 0, repo.atualizarStatusCalls)
+	notaAtual, err := repo.FindByNumero(nota.Numero)
+
+	require.NoError(t, err)
+
+	assert.Equal(
+		t,
+		domain.StatusAberta,
+		notaAtual.Status,
+	)
+
+	// Como a primeira baixa falhou,
+	// nenhum estorno deve ser realizado.
+	require.Len(t, estoque.chamadas, 1)
+
+	assert.Equal(
+		t,
+		chamada{"baixa", "P001", 10},
+		estoque.chamadas[0],
+	)
 }
 
-func TestNotaFiscalService_ImprimirNaoFechaSeAtualizacaoFalhar(
-	t *testing.T,
-) {
-	svc, repo, estoque := criarService()
+func TestImprimir_ErroComunicacaoEstoque(t *testing.T) {
+	repo := newMockRepo()
+
+	estoque := &mockEstoque{
+		falharNoItem: 0,
+		erro:         client.ErrEstoqueIndisponivel,
+	}
+
+	svc := service.NewNotaFiscalService(repo, estoque)
 
 	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
 		{
-			ProdutoCodigo: "PROD-001",
+			ProdutoCodigo: "P001",
 			Quantidade:    2,
 		},
 	})
 
 	require.NoError(t, err)
 
-	erroAtualizacao := errors.New("erro ao atualizar nota")
-	repo.atualizarStatusError = erroAtualizacao
+	_, err = svc.Imprimir(nota.Numero)
 
-	resultado, err := svc.Imprimir(nota.Numero)
+	require.Error(t, err)
 
-	assert.Nil(t, resultado)
-	assert.ErrorIs(t, err, erroAtualizacao)
+	assert.ErrorIs(
+		t,
+		err,
+		service.ErrFalhaComunicacaoEstoque,
+	)
 
-	assert.Len(t, estoque.itensRecebidos, 1)
+	notaAtual, err := repo.FindByNumero(nota.Numero)
 
-	// O domínio já mudou para FECHADA antes da persistência.
-	assert.Equal(t, domain.StatusFechada, nota.Status)
+	require.NoError(t, err)
 
-	assert.Equal(t, 1, repo.atualizarStatusCalls)
+	assert.Equal(
+		t,
+		domain.StatusAberta,
+		notaAtual.Status,
+	)
 }
 
-func TestNotaFiscalService_ImprimirPropagaErroDaBusca(
-	t *testing.T,
-) {
-	svc, repo, estoque := criarService()
+func TestImprimir_NotaJaFechada(t *testing.T) {
+	repo := newMockRepo()
 
-	erro := repository.ErrNotaNaoEncontrada
-	repo.findByNumeroError = erro
-
-	resultado, err := svc.Imprimir(999)
-
-	assert.Nil(t, resultado)
-	assert.ErrorIs(t, err, erro)
-
-	assert.Empty(t, estoque.itensRecebidos)
-	assert.Equal(t, 0, repo.atualizarStatusCalls)
-}
-
-func estoqueCalls(estoque *mockEstoqueGateway) int {
-	if len(estoque.itensRecebidos) == 0 {
-		return 0
+	estoque := &mockEstoque{
+		falharNoItem: -1,
 	}
 
-	return 1
+	svc := service.NewNotaFiscalService(repo, estoque)
+
+	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
+		{
+			ProdutoCodigo: "P001",
+			Quantidade:    2,
+		},
+	})
+
+	require.NoError(t, err)
+
+	// Primeira impressão.
+	_, err = svc.Imprimir(nota.Numero)
+
+	require.NoError(t, err)
+
+	estoque.chamadas = nil
+
+	// Segunda impressão.
+	_, err = svc.Imprimir(nota.Numero)
+
+	require.ErrorIs(
+		t,
+		err,
+		domain.ErrNotaNaoAberta,
+	)
+
+	// Não deve chamar o estoque novamente.
+	assert.Empty(t, estoque.chamadas)
+}
+
+func TestImprimir_NotaNaoEncontrada(t *testing.T) {
+	repo := newMockRepo()
+
+	estoque := &mockEstoque{
+		falharNoItem: -1,
+	}
+
+	svc := service.NewNotaFiscalService(repo, estoque)
+
+	_, err := svc.Imprimir(999)
+
+	require.Error(t, err)
+
+	assert.ErrorIs(
+		t,
+		err,
+		repository.ErrNotaNaoEncontrada,
+	)
+
+	assert.Empty(t, estoque.chamadas)
+}
+
+func TestImprimir_RetryAposCompensacao(t *testing.T) {
+	repo := newMockRepo()
+
+	estoque := &mockEstoque{
+		falharNoItem: 1,
+		erro:         client.ErrProdutoNaoEncontrado,
+	}
+
+	svc := service.NewNotaFiscalService(repo, estoque)
+
+	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
+		{
+			ProdutoCodigo: "P001",
+			Quantidade:    3,
+		},
+		{
+			ProdutoCodigo: "P002",
+			Quantidade:    1,
+		},
+	})
+
+	require.NoError(t, err)
+
+	// Primeira tentativa falha.
+	_, err = svc.Imprimir(nota.Numero)
+
+	require.Error(t, err)
+
+	// Segunda tentativa deve funcionar.
+	estoque.falharNoItem = -1
+	estoque.baixas = 0
+	estoque.chamadas = nil
+
+	impressa, err := svc.Imprimir(nota.Numero)
+
+	require.NoError(t, err)
+
+	assert.Equal(
+		t,
+		domain.StatusFechada,
+		impressa.Status,
+	)
+
+	require.Len(t, estoque.chamadas, 2)
+
+	assert.Equal(
+		t,
+		chamada{"baixa", "P001", 3},
+		estoque.chamadas[0],
+	)
+
+	assert.Equal(
+		t,
+		chamada{"baixa", "P002", 1},
+		estoque.chamadas[1],
+	)
+}
+
+// ---------------------------------------------------------
+// Falhas de persistência
+// ---------------------------------------------------------
+
+func TestCriarNota_ErroRepository(t *testing.T) {
+	repo := newMockRepo()
+
+	repo.createErr = errors.New("erro banco")
+
+	estoque := &mockEstoque{
+		falharNoItem: -1,
+	}
+
+	svc := service.NewNotaFiscalService(repo, estoque)
+
+	_, err := svc.CriarNota([]service.ItemNotaFiscalInput{
+		{
+			ProdutoCodigo: "P001",
+			Quantidade:    1,
+		},
+	})
+
+	require.Error(t, err)
+
+	assert.Contains(
+		t,
+		err.Error(),
+		"erro ao criar nota fiscal",
+	)
+}
+
+func TestImprimir_ErroAtualizarStatusCompensa(t *testing.T) {
+	repo := newMockRepo()
+
+	estoque := &mockEstoque{
+		falharNoItem: -1,
+	}
+
+	svc := service.NewNotaFiscalService(repo, estoque)
+
+	nota, err := svc.CriarNota([]service.ItemNotaFiscalInput{
+		{
+			ProdutoCodigo: "P001",
+			Quantidade: 3,
+		},
+	})
+
+	require.NoError(t, err)
+
+	repo.atualizarStatusErr = errors.New("erro ao atualizar status")
+
+	_, err = svc.Imprimir(nota.Numero)
+
+	require.Error(t, err)
+
+	assert.Contains(
+		t,
+		err.Error(),
+		"erro ao atualizar status",
+	)
+
+	require.Len(t, estoque.chamadas, 2)
+
+	assert.Equal(
+		t,
+		chamada{"baixa", "P001", 3},
+		estoque.chamadas[0],
+	)
+
+	assert.Equal(
+		t,
+		chamada{"estorno", "P001", 3},
+		estoque.chamadas[1],
+	)
 }

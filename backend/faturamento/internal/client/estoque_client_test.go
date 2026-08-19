@@ -9,10 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/DihannNagib/Korp_Teste_Dihann/backend/faturamento/internal/client"
-	"github.com/DihannNagib/Korp_Teste_Dihann/backend/faturamento/internal/domain"
 )
 
-func TestEstoqueClient_BaixarItens(t *testing.T) {
+func TestEstoqueClient_BaixarItem(t *testing.T) {
 	var requisicoes int
 
 	server := httptest.NewServer(
@@ -23,6 +22,11 @@ func TestEstoqueClient_BaixarItens(t *testing.T) {
 			requisicoes++
 
 			assert.Equal(t, http.MethodPatch, r.Method)
+			assert.Equal(
+				t,
+				"/api/v1/produtos/PROD-001/saldo",
+				r.URL.Path,
+			)
 
 			w.WriteHeader(http.StatusOK)
 		}),
@@ -32,21 +36,13 @@ func TestEstoqueClient_BaixarItens(t *testing.T) {
 
 	estoqueClient := client.NewEstoqueClient(server.URL)
 
-	itens := []domain.ItemNotaFiscal{
-		{
-			ProdutoCodigo: "PROD-001",
-			Quantidade:    3,
-		},
-		{
-			ProdutoCodigo: "PROD-002",
-			Quantidade:    5,
-		},
-	}
-
-	err := estoqueClient.BaixarItens(itens)
+	err := estoqueClient.BaixarItem(
+		"PROD-001",
+		3,
+	)
 
 	require.NoError(t, err)
-	assert.Equal(t, 2, requisicoes)
+	assert.Equal(t, 1, requisicoes)
 }
 
 func TestEstoqueClient_BaixarItemSaldoInsuficiente(t *testing.T) {
@@ -124,7 +120,11 @@ func TestEstoqueClient_BaixarItemEstoqueIndisponivel(t *testing.T) {
 		1,
 	)
 
-	assert.Error(t, err)
+	assert.ErrorIs(
+		t,
+		err,
+		client.ErrEstoqueIndisponivel,
+	)
 }
 
 func TestEstoqueClient_BaixarItemServidorIndisponivel(t *testing.T) {

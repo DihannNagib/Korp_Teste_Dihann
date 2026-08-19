@@ -19,10 +19,10 @@ import (
 )
 
 type mockNotaFiscalService struct {
-	criarNotaFn func([]service.ItemNotaFiscalInput) (*domain.NotaFiscal, error)
+	criarNotaFn       func([]service.ItemNotaFiscalInput) (*domain.NotaFiscal, error)
 	buscarPorNumeroFn func(uint) (*domain.NotaFiscal, error)
-	listarFn func() ([]domain.NotaFiscal, error)
-	imprimirFn func(uint) (*domain.NotaFiscal, error)
+	listarFn          func() ([]domain.NotaFiscal, error)
+	imprimirFn        func(uint) (*domain.NotaFiscal, error)
 }
 
 func (m *mockNotaFiscalService) CriarNota(
@@ -397,12 +397,68 @@ func TestNotaFiscalHandler_ImprimirNotaNaoAberta(t *testing.T) {
 	)
 }
 
-func TestNotaFiscalHandler_ImprimirEstoqueIndisponivel(t *testing.T) {
+func TestNotaFiscalHandler_ImprimirSaldoInsuficienteEstoque(t *testing.T) {
 	svc := &mockNotaFiscalService{
 		imprimirFn: func(
 			uint,
 		) (*domain.NotaFiscal, error) {
-			return nil, service.ErrBaixaEstoque
+			return nil, service.ErrSaldoInsuficienteEstoque
+		},
+	}
+
+	router := setupRouter(svc)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/notas/1/imprimir",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(
+		t,
+		http.StatusUnprocessableEntity,
+		rec.Code,
+	)
+}
+
+func TestNotaFiscalHandler_ImprimirProdutoNaoEncontradoEstoque(t *testing.T) {
+	svc := &mockNotaFiscalService{
+		imprimirFn: func(
+			uint,
+		) (*domain.NotaFiscal, error) {
+			return nil, service.ErrProdutoNaoEncontradoEstoque
+		},
+	}
+
+	router := setupRouter(svc)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/notas/1/imprimir",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(
+		t,
+		http.StatusNotFound,
+		rec.Code,
+	)
+}
+
+func TestNotaFiscalHandler_ImprimirFalhaComunicacaoEstoque(t *testing.T) {
+	svc := &mockNotaFiscalService{
+		imprimirFn: func(
+			uint,
+		) (*domain.NotaFiscal, error) {
+			return nil, service.ErrFalhaComunicacaoEstoque
 		},
 	}
 
@@ -421,6 +477,64 @@ func TestNotaFiscalHandler_ImprimirEstoqueIndisponivel(t *testing.T) {
 	assert.Equal(
 		t,
 		http.StatusServiceUnavailable,
+		rec.Code,
+	)
+}
+
+func TestNotaFiscalHandler_ImprimirNumeroInvalido(t *testing.T) {
+	svc := &mockNotaFiscalService{
+		imprimirFn: func(
+			uint,
+		) (*domain.NotaFiscal, error) {
+			t.Fatal("service não deveria ser chamado")
+			return nil, nil
+		},
+	}
+
+	router := setupRouter(svc)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/notas/abc/imprimir",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		rec.Code,
+	)
+}
+
+func TestNotaFiscalHandler_ImprimirNumeroZero(t *testing.T) {
+	svc := &mockNotaFiscalService{
+		imprimirFn: func(
+			uint,
+		) (*domain.NotaFiscal, error) {
+			t.Fatal("service não deveria ser chamado")
+			return nil, nil
+		},
+	}
+
+	router := setupRouter(svc)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/notas/0/imprimir",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
 		rec.Code,
 	)
 }
