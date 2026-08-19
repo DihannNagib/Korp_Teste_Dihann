@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -133,10 +134,19 @@ func TestProdutoRepository_FindAll(t *testing.T) {
 	produtos, err := repo.FindAll()
 
 	require.NoError(t, err)
-	require.Len(t, produtos, 2)
 
-	assert.Equal(t, "TESTE-FINDALL-001", produtos[0].Codigo)
-	assert.Equal(t, "TESTE-FINDALL-002", produtos[1].Codigo)
+	var produtosTeste []domain.Produto
+
+	for _, produto := range produtos {
+		if strings.HasPrefix(produto.Codigo, "TESTE-") {
+			produtosTeste = append(produtosTeste, produto)
+		}
+	}
+
+	require.Len(t, produtosTeste, 2)
+
+	assert.Equal(t, "TESTE-FINDALL-001", produtosTeste[0].Codigo)
+	assert.Equal(t, "TESTE-FINDALL-002", produtosTeste[1].Codigo)
 }
 
 func TestProdutoRepository_AjustarSaldoReducao(t *testing.T) {

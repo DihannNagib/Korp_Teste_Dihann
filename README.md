@@ -2,8 +2,8 @@
 
 Aplicação web composta por um frontend em Angular e dois microsserviços backend desenvolvidos em Go:
 
-* **Estoque** — responsável pelo controle de produtos e saldos.
-* **Faturamento** — responsável pela gestão das notas fiscais.
+- **Estoque** — responsável pelo controle de produtos e saldos.
+- **Faturamento** — responsável pela gestão das notas fiscais.
 
 Cada microsserviço possui seu próprio banco de dados PostgreSQL.
 
@@ -34,31 +34,31 @@ A solução utiliza uma arquitetura baseada em microsserviços:
 
 ### Frontend
 
-* Angular
-* TypeScript
-* SCSS
+- Angular
+- TypeScript
+- SCSS
 
 ### Backend
 
-* Go
-* Gin
-* GORM
+- Go
+- Gin
+- GORM
 
 ### Banco de dados
 
-* PostgreSQL 15
+- PostgreSQL 15
 
 ### Infraestrutura
 
-* Docker
-* Docker Compose
+- Docker
+- Docker Compose
 
 ## Pré-requisitos
 
-* Docker
-* Go 1.21+
-* Node.js
-* npm
+- Docker
+- Go 1.21+
+- Node.js
+- npm
 
 ## Estrutura
 
@@ -153,14 +153,33 @@ docker compose down
 
 ### Microsserviço de Estoque
 
+#### Migrations
+
+As migrations do banco de dados são versionadas por microsserviço.
+
+Para executar as migrations do Estoque:
+
 ```bash
 cd backend/estoque
+migrate -path migrations -database "postgres://<ESTOQUE_DB_USER>:<ESTOQUE_DB_PASSWORD>@<ESTOQUE_DB_HOST>:<ESTOQUE_DB_PORT>/<ESTOQUE_DB_NAME>?sslmode=disable" up
+```
+#### Testes
+
+Para executar os testes automatizados do Estoque:
+```bash
+go test ./... -v
+```
+Os testes do repository utilizam o PostgreSQL configurado no ambiente de desenvolvimento.
+
+#### Execução
+
+```bash
 go run ./cmd
 ```
 
-**API:** http://localhost:8080
+**API:** [http://localhost:8080](http://localhost:8080)
 
-**Health Check:** http://localhost:8080/health
+**Health Check:** [http://localhost:8080/health](http://localhost:8080/health)
 
 ### Microsserviço de Faturamento
 
@@ -169,9 +188,9 @@ cd backend/faturamento
 go run ./cmd
 ```
 
-**API:** http://localhost:8081
+**API:** [http://localhost:8081](http://localhost:8081)
 
-**Health Check:** http://localhost:8081/health
+**Health Check:** [http://localhost:8081/health](http://localhost:8081/health)
 
 ### Frontend
 
@@ -181,17 +200,19 @@ npm install
 npm start
 ```
 
-**Aplicação:** http://localhost:4200
+**Aplicação:** [http://localhost:4200](http://localhost:4200)
 
 ## Portas
 
-| Serviço                |  Porta |
-| ---------------------- | -----: |
+
+| Serviço                | Porta  |
+| ---------------------- | ------ |
 | Angular                | `4200` |
 | Estoque API            | `8080` |
 | Faturamento API        | `8081` |
 | PostgreSQL Estoque     | `5433` |
 | PostgreSQL Faturamento | `5434` |
+
 
 ## Documentação Técnica
 

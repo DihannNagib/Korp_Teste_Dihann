@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ErrProdutoNaoEncontrado = errors.New("produto nao encontrado")
-	ErrCodigoJaExiste       = errors.New("codigo de produto ja cadastrado")
+	ErrProdutoNaoEncontrado = errors.New("produto não encontrado")
+  ErrCodigoJaExiste       = errors.New("código de produto já cadastrado")
 )
 
 type ProdutoRepository interface {
