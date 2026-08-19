@@ -8,6 +8,10 @@ import (
 
 	"github.com/DihannNagib/Korp_Teste_Dihann/backend/estoque/internal/config"
 	"github.com/DihannNagib/Korp_Teste_Dihann/backend/estoque/internal/database"
+	"github.com/DihannNagib/Korp_Teste_Dihann/backend/estoque/internal/handler"
+	"github.com/DihannNagib/Korp_Teste_Dihann/backend/estoque/internal/middleware"
+	"github.com/DihannNagib/Korp_Teste_Dihann/backend/estoque/internal/repository"
+	"github.com/DihannNagib/Korp_Teste_Dihann/backend/estoque/internal/service"
 )
 
 func main() {
@@ -17,10 +21,19 @@ func main() {
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("erro ao obter conexao sql: %v", err)
 	}
 
-	router := gin.Default()
+	produtoRepository := repository.NewProdutoRepository(db)
+	produtoService := service.NewProdutoService(produtoRepository)
+	produtoHandler := handler.NewProdutoHandler(produtoService)
+
+	router := gin.New()
+
+	router.Use(
+		gin.Logger(),
+		middleware.Recovery(),
+	)
 
 	router.GET("/health", func(c *gin.Context) {
 		if err := sqlDB.Ping(); err != nil {
@@ -37,7 +50,15 @@ func main() {
 		})
 	})
 
-	if err := router.Run(":" + cfg.ServerPort); err != nil {
-		log.Fatal(err)
+	api := router.Group("/api/v1")
+
+	produtoHandler.RegisterRoutes(api)
+
+	port := cfg.ServerPort
+
+	log.Printf("[ESTOQUE] servidor rodando na porta %s", port)
+
+	if err := router.Run(":" + port); err != nil {
+		log.Fatalf("erro ao subir servidor: %v", err)
 	}
 }
