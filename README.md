@@ -1,4 +1,4 @@
-# raKorp — Sistema de Emissão de Notas Fiscais
+# Korp — Sistema de Emissão de Notas Fiscais
 
 Teste técnico da Korp: sistema para cadastro de produtos, emissão de notas
 fiscais e controle de estoque, estruturado como uma arquitetura de
@@ -49,6 +49,8 @@ para consultar e baixar saldo no momento da impressão da nota.
 - Node.js 18+ e npm
 - `[golang-migrate](https://github.com/golang-migrate/migrate)` (CLI, para rodar as migrations)
 
+
+
 ## Subindo o ambiente completo
 
 ```bash
@@ -81,6 +83,8 @@ Korp_Teste_Dihann/
 ├── docker-compose.yml
 └── README.md             (este arquivo)
 ```
+
+
 
 ## Portas
 
