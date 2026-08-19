@@ -39,7 +39,7 @@ independência de deploy que a arquitetura de microsserviços exige.
 
 Detalhes de execução de cada serviço:
 [`backend/estoque/README.md`](../backend/estoque/README.md) |
-`backend/faturamento/README.md` (em breve).
+[`backend/faturamento/README.md`](../backend/faturamento/README.md).
 
 ---
 
@@ -153,6 +153,17 @@ falhar, em vez de simplesmente responder `200` fixo. Isso é o que
 possibilita observar e testar o cenário obrigatório de falha de
 microsserviço (ver seção 7).
 
+**Faturamento — mapeamento equivalente**, com uma nuance própria: erros
+vindos da chamada ao Estoque durante a impressão são diferenciados em
+três categorias — `ErrSaldoInsuficienteEstoque` (`422`),
+`ErrProdutoNaoEncontradoEstoque` (`404`) e `ErrFalhaComunicacaoEstoque`
+(`503`, cobrindo indisponibilidade de rede/timeout e qualquer status
+HTTP não mapeado explicitamente). Essa diferenciação já existia no
+`client.EstoqueClient` desde a primeira versão do serviço; o `service`
+apenas repassa a classificação original em vez de agrupar tudo sob um
+único erro genérico. Detalhes:
+[`backend/faturamento/README.md`](../backend/faturamento/README.md#mapeamento-de-erro--status-http).
+
 ### 3.4 Uso de LINQ / C#
 
 Não aplicável — a solução foi implementada inteiramente em Go, sem uso de
@@ -246,9 +257,9 @@ func (n *NotaFiscal) PodeSerImpressa() error {
 Uma decisão específica do Faturamento: `Fechar()` retorna `error` e
 recusa fechar uma nota que não esteja `ABERTA`, em vez de ser uma
 operação incondicional. Isso obriga qualquer código chamador (o
-`service`, quando implementado) a lidar explicitamente com esse
-retorno — reduzindo a chance de a nota ser fechada duas vezes por
-engano em um fluxo com múltiplas etapas assíncronas.
+`service`) a lidar explicitamente com esse retorno — reduzindo a
+chance de a nota ser fechada duas vezes por engano em um fluxo com
+múltiplas etapas.
 
 ### 4.2.3 Numeração sequencial
 
@@ -281,6 +292,71 @@ carregadas em memória no momento da chamada. Validado por teste de
 integração dedicado (`TestNotaFiscalRepository_AtualizarStatusNaoAlteraItens`)
 que confirma que os itens permanecem intactos após uma atualização de
 status.
+
+### 4.2.5 Integração com o Estoque e Compensação
+
+A comunicação com o Estoque é feita via `EstoqueClient`
+(`internal/client`), com dois métodos simétricos:
+
+```go
+func (c *EstoqueClient) BaixarItem(produtoCodigo string, quantidade int) error
+func (c *EstoqueClient) EstornarItem(produtoCodigo string, quantidade int) error
+```
+
+Ambos usam o mesmo endpoint do Estoque (`PATCH /produtos/:codigo/saldo`),
+diferindo apenas no sinal do `delta` — reaproveitando a decisão já
+tomada no Estoque de ter um único endpoint de ajuste em vez de rotas
+separadas de baixa/estorno.
+
+O service depende da interface `EstoqueGateway`, não do client
+concreto, permitindo testar `Imprimir` com um mock em testes unitários
+sem subir o Estoque real.
+
+**Baixa item a item com compensação (padrão saga):** ao imprimir,
+`Imprimir` percorre os itens da nota individualmente, acumulando os
+que já foram baixados com sucesso. Se um item falhar, todos os itens
+já processados nesta tentativa são estornados antes do erro ser
+propagado:
+
+```go
+processados := make([]domain.ItemNotaFiscal, 0, len(nota.Itens))
+
+for _, item := range nota.Itens {
+    if err := s.estoque.BaixarItem(item.ProdutoCodigo, item.Quantidade); err != nil {
+        s.compensar(processados)
+        return nil, mapearErroEstoque(err, item.ProdutoCodigo)
+    }
+    processados = append(processados, item)
+}
+```
+
+Essa abordagem — baixar item a item e compensar em caso de falha, em
+vez de delegar a baixa de todos os itens para dentro do client — foi
+adotada porque só o `service` tem visibilidade de **quais** itens já
+foram processados com sucesso no momento da falha; centralizar isso
+no client exigiria que ele expusesse estado ou uma API mais complexa,
+misturando responsabilidades de transporte HTTP com orquestração de
+negócio.
+
+**Garantia obtida:** ou a nota é processada por completo (todos os
+itens baixados, nota `FECHADA`), ou nenhum saldo fica baixado
+"órfão" — nunca um estado intermediário. Isso também torna a operação
+de impressão **segura para retry**: uma nova tentativa após falha
+reprocessa a nota do zero sem duplicar baixas de itens que já tinham
+sido processados e depois compensados.
+
+**Limitação aceita:** a compensação (`estornar`) é "melhor esforço" —
+se o próprio estorno falhar (ex: o Estoque cai no meio da
+compensação), o erro é registrado em log para reconciliação manual,
+não retentado automaticamente nem persistido como pendência. Uma
+evolução possível seria uma fila/tabela de compensações pendentes
+reprocessadas por job assíncrono, fora do escopo desta versão.
+
+Validado por teste unitário
+(`TestImprimir_FalhaNoMeioCompensaItensAnteriores`,
+`TestImprimir_RetryAposCompensacaoNaoDuplicaBaixa`) e por roteiro
+manual com os dois serviços reais:
+[`backend/faturamento/README.md`](../backend/faturamento/README.md#cenário-de-falha-requisito-obrigatório).
 
 Detalhes de execução, schema completo e testes:
 [`backend/faturamento/README.md`](../backend/faturamento/README.md).
@@ -324,12 +400,21 @@ o processo nem suba se a configuração estiver incompleta.
 
 - **Tratamento de concorrência:** lock pessimista (`SELECT ... FOR
   UPDATE`) descrito na seção 4.1, validado manualmente.
-- **Idempotência:** *a definir conforme implementação no Faturamento.*
-- **Uso de IA:** *a definir.*
+- **Idempotência:** implementada parcialmente via compensação
+  automática (seção 4.2.5) — a operação de impressão é segura para
+  retry após falha, pois qualquer baixa parcial é estornada antes do
+  erro ser propagado. Não há, porém, uma chave de idempotência
+  explícita (ex: header `Idempotency-Key`) nas chamadas HTTP entre os
+  serviços; a garantia atual vem inteiramente do padrão de
+  compensação no nível de aplicação, não de deduplicação na camada de
+  transporte.
+- **Uso de IA:** não implementado nesta versão.
 
 ---
 
 ## 7. Requisito Obrigatório: Tratamento de Falhas
+
+### Falha de banco de dados (Estoque e Faturamento)
 
 O cenário de falha de microsserviço é observável e testável através do
 `/health` de cada serviço, que verifica a conexão real com o banco
@@ -342,21 +427,46 @@ A aplicação se recupera sozinha assim que a conexão volta a responder,
 sem necessidade de reiniciar o processo. Passo a passo de validação:
 [`backend/estoque/README.md`](../backend/estoque/README.md#teste-de-falha-do-banco).
 
-O feedback ao usuário final (frontend) e o cenário de falha na
-comunicação entre Faturamento → Estoque durante a emissão de nota serão
-detalhados na seção do Faturamento, quando implementados.
+### Falha na comunicação Faturamento → Estoque
+
+Durante a impressão de uma nota, se uma chamada ao Estoque falhar (por
+indisponibilidade, saldo insuficiente ou produto não encontrado), o
+Faturamento:
+
+1. Estorna automaticamente qualquer item já baixado com sucesso nesta
+   tentativa (compensação — ver seção 4.2.5);
+2. Não fecha a nota — ela permanece `ABERTA`;
+3. Devolve ao cliente HTTP um status diferenciado conforme a causa
+   (`422` saldo insuficiente, `404` produto não encontrado, `503`
+   indisponibilidade);
+4. Permite nova tentativa de impressão assim que o problema for
+   resolvido, sem risco de dupla baixa nos itens já processados
+   anteriormente.
+
+Validado manualmente com dois cenários: falha total (Estoque fora do
+ar) e falha parcial (um item específico inválido no meio de uma nota
+com múltiplos itens), confirmando em ambos os casos que a nota
+permanece `ABERTA`, o saldo dos itens não é duplicado em retry, e o
+saldo do item afetado pela falha volta ao valor original via
+compensação. Roteiro completo:
+[`backend/faturamento/README.md`](../backend/faturamento/README.md#cenário-de-falha-requisito-obrigatório).
 
 ---
 
 ## 8. Metodologia de Testes
 
-- **Automatizados** (`go test ./... -v`): unitários de domínio (sem
-  infraestrutura) e de integração de repository (contra PostgreSQL
-  real).
-- **Manuais**: roteiro end-to-end (handler → service → repository →
-  banco), cobrindo casos de erro, persistência entre reinícios,
-  concorrência e falha de banco. Roteiro completo:
+- **Estoque** — automatizados (`go test ./... -v`): unitários de
+  domínio (sem infraestrutura) e de integração de repository (contra
+  PostgreSQL real). Manuais: roteiro end-to-end de 18 cenários +
+  concorrência. Roteiro completo:
   [`backend/estoque/README.md`](../backend/estoque/README.md#roteiro-de-testes-manuais).
+- **Faturamento** — automatizados: unitários de domínio, integração
+  de repository, e unitários de service com mock de `EstoqueGateway`
+  (incluindo compensação e retry após falha parcial). Manuais:
+  roteiro de 21 cenários cobrindo CRUD de notas, transições de
+  status, e os dois cenários obrigatórios de falha (total e parcial)
+  do Estoque. Roteiro completo:
+  [`backend/faturamento/README.md`](../backend/faturamento/README.md#roteiro-de-testes-manuais-completo).
 
 ---
 
@@ -370,17 +480,31 @@ detalhados na seção do Faturamento, quando implementados.
   validação de payload, tratamento de erros centralizado, testes
   automatizados e roteiro de testes manuais (18 cenários + concorrência)
   validados;
-- Migrations versionadas do Estoque;
-- Health check do Estoque com verificação real de banco, validado em
-  cenário de falha e recuperação;
-- Faturamento: configuração, conexão com banco, domínio `NotaFiscal`
-  (regras de status e itens), migrations (incluindo sequência própria
-  de numeração fiscal) e repository, todos com testes automatizados
-  (unitários de domínio + integração de repository).
+- Serviço de Faturamento completo: domínio (`NotaFiscal` com
+  numeração sequencial via sequência própria do Postgres), repository,
+  cliente HTTP de integração com o Estoque, service com orquestração
+  de impressão e **compensação automática** (padrão saga) em caso de
+  falha parcial, handler com tratamento de erro diferenciado por
+  status HTTP. Testes automatizados de domínio, repository e service
+  (incluindo compensação e retry), e roteiro de 21 cenários manuais,
+  cobrindo os dois cenários obrigatórios de falha (total e parcial)
+  entre os dois serviços;
+- Migrations versionadas de ambos os serviços;
+- Health check de ambos os serviços com verificação real de banco,
+  validado em cenário de falha e recuperação.
+
+### Limitações conhecidas
+
+- A compensação (estorno) em caso de falha parcial na impressão é
+  "melhor esforço": se o próprio estorno falhar, o erro é apenas
+  registrado em log, sem retry automático ou persistência de
+  pendência para reconciliação (ver seção 4.2.5);
+- Não há chave de idempotência explícita (`Idempotency-Key`) nas
+  chamadas HTTP entre Faturamento e Estoque — a garantia de segurança
+  em retry vem da compensação no nível de aplicação, não de um
+  mecanismo de deduplicação na camada de transporte.
 
 ### Em andamento
 
-- Faturamento: cliente HTTP de integração com o Estoque, service com
-  orquestração de impressão e compensação automática em caso de falha
-  de comunicação, handler e exposição da API HTTP;
+- Dockerfile e integração do Faturamento no `docker-compose.yml`;
 - Frontend Angular (telas de cadastro, listagem e impressão de notas).
