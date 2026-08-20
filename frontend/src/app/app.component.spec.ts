@@ -24,7 +24,7 @@ describe('AppComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     expect(compiled.querySelector('span')?.textContent).toContain(
-      'Notas Fiscais',
+      'Sistema de emissão de Notas Fiscais',
     );
   });
 });

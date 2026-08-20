@@ -1,0 +1,41 @@
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px">
+  <h2>Produtos</h2>
+  <button mat-raised-button color="primary" routerLink="/produtos/novo">
+    <mat-icon>add</mat-icon> Novo Produto
+  </button>
+</div>
+
+@if (carregando) {
+  <mat-spinner diameter="32" />
+}
+
+@if (erro) {
+  <p style="color:#b00020">{{ erro }}</p>
+  <button mat-stroked-button (click)="carregar()">Tentar novamente</button>
+}
+
+@if (!carregando && !erro) {
+  @if (produtos.length === 0) {
+    <p>Nenhum produto cadastrado ainda.</p>
+  } @else {
+    <table mat-table [dataSource]="produtos" style="width:100%">
+      <ng-container matColumnDef="codigo">
+        <th mat-header-cell *matHeaderCellDef>Código</th>
+        <td mat-cell *matCellDef="let p">{{ p.codigo }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="descricao">
+        <th mat-header-cell *matHeaderCellDef>Descrição</th>
+        <td mat-cell *matCellDef="let p">{{ p.descricao }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="saldo">
+        <th mat-header-cell *matHeaderCellDef>Saldo</th>
+        <td mat-cell *matCellDef="let p">{{ p.saldo }}</td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="colunas"></tr>
+      <tr mat-row *matRowDef="let row; columns: colunas"></tr>
+    </table>
+  }
+}
