@@ -16,8 +16,6 @@ var (
 	ErrProdutoNaoEncontradoEstoque = errors.New("produto nao encontrado no estoque")
 )
 
-// EstoqueGateway e a interface que o service depende, permitindo mock
-// em testes unitarios sem subir o servico de Estoque real.
 type EstoqueGateway interface {
 	BaixarItem(produtoCodigo string, quantidade int) error
 	EstornarItem(produtoCodigo string, quantidade int) error
@@ -65,10 +63,6 @@ func (s *notaFiscalService) Listar() ([]domain.NotaFiscal, error) {
 	return s.repository.FindAll()
 }
 
-// Imprimir baixa o saldo de cada item, um a um. Se algum item falhar,
-// todos os itens ja baixados com sucesso nesta tentativa sao
-// compensados (estornados) antes do erro ser propagado -- a nota
-// permanece ABERTA e nenhum saldo fica baixado "orfao".
 func (s *notaFiscalService) Imprimir(numero uint) (*domain.NotaFiscal, error) {
 	nota, err := s.repository.FindByNumero(numero)
 	if err != nil {
@@ -102,9 +96,6 @@ func (s *notaFiscalService) Imprimir(numero uint) (*domain.NotaFiscal, error) {
 	return nota, nil
 }
 
-// compensar e "melhor esforco": se o proprio estorno falhar (ex:
-// Estoque caiu no meio da compensacao), registramos um alerta em log
-// para reconciliacao manual em vez de perder o erro silenciosamente.
 func (s *notaFiscalService) compensar(itens []domain.ItemNotaFiscal) {
 	for _, item := range itens {
 		if err := s.estoque.EstornarItem(item.ProdutoCodigo, item.Quantidade); err != nil {

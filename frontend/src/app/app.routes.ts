@@ -17,6 +17,20 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'notas',
+    loadComponent: () =>
+      import('./features/notas/nota-list/nota-list.component').then(
+        (m) => m.NotaListComponent,
+      ),
+  },
+  {
+    path: 'notas/nova',
+    loadComponent: () =>
+      import('./features/notas/nota-form/nota-form.component').then(
+        (m) => m.NotaFormComponent,
+      ),
+  },
+  {
     path: '**',
     redirectTo: 'produtos',
   },

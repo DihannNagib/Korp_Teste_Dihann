@@ -1,0 +1,42 @@
+<h2>Nova Nota Fiscal</h2>
+
+<form [formGroup]="form" (ngSubmit)="salvar()" style="max-width:600px">
+  <div formArrayName="itens">
+    @for (item of itens.controls; track item; let i = $index) {
+      <div [formGroupName]="i" style="display:flex; gap:8px; align-items:flex-start; margin-bottom:8px">
+        <mat-form-field style="flex:1">
+          <mat-label>Código do produto</mat-label>
+          <input matInput formControlName="produtoCodigo" />
+        </mat-form-field>
+
+        <mat-form-field style="width:140px">
+          <mat-label>Quantidade</mat-label>
+          <input matInput type="number" formControlName="quantidade" />
+        </mat-form-field>
+
+        <button mat-icon-button type="button" (click)="removerItem(i)" [disabled]="itens.length === 1" style="margin-top:8px">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    }
+  </div>
+
+  <button mat-stroked-button type="button" (click)="adicionarItem()">
+    <mat-icon>add</mat-icon> Adicionar item
+  </button>
+
+  @if (erroGeral) {
+    <p style="color:#b00020">{{ erroGeral }}</p>
+  }
+
+  <div style="margin-top:16px; display:flex; gap:8px">
+    <button mat-raised-button color="primary" type="submit" [disabled]="salvando">
+      @if (salvando) {
+        <mat-spinner diameter="20" style="display:inline-block" />
+      } @else {
+        Criar Nota
+      }
+    </button>
+    <button mat-button type="button" routerLink="/notas">Cancelar</button>
+  </div>
+</form>
