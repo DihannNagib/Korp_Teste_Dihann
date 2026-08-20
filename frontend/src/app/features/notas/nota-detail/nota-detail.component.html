@@ -1,0 +1,48 @@
+<a routerLink="/notas">&larr; Voltar para notas fiscais</a>
+
+@if (carregando) {
+  <div style="margin-top:16px"><mat-spinner diameter="32" /></div>
+}
+
+@if (erro) {
+  <p style="color:#b00020; margin-top:16px">{{ erro }}</p>
+}
+
+@if (nota) {
+  <div style="display:flex; align-items:center; gap:12px; margin-top:16px">
+    <h2 style="margin:0">Nota Fiscal Nº {{ nota.numero }}</h2>
+    <mat-chip [color]="nota.status === 'ABERTA' ? 'accent' : 'primary'" selected>
+      {{ nota.status }}
+    </mat-chip>
+  </div>
+
+  <table style="width:100%; margin:16px 0; border-collapse:collapse">
+    <thead>
+      <tr style="text-align:left; border-bottom:1px solid #ccc">
+        <th style="padding:8px 0">Produto</th>
+        <th style="padding:8px 0">Quantidade</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (item of nota.itens; track item.id) {
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:8px 0">{{ item.produtoCodigo }}</td>
+          <td style="padding:8px 0">{{ item.quantidade }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  @if (nota.status === 'ABERTA') {
+    <button mat-raised-button color="primary" (click)="imprimir()" [disabled]="imprimindo">
+      @if (imprimindo) {
+        <mat-spinner diameter="20" style="display:inline-block; margin-right:8px" />
+        Processando...
+      } @else {
+        <span style="display:flex; align-items:center; gap:4px">
+          <mat-icon>print</mat-icon> Imprimir Nota
+        </span>
+      }
+    </button>
+  }
+}

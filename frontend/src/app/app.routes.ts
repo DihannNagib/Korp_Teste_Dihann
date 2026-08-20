@@ -31,6 +31,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'notas/:numero',
+    loadComponent: () =>
+      import('./features/notas/nota-detail/nota-detail.component').then(
+        (m) => m.NotaDetailComponent,
+      ),
+  },
+  {
     path: '**',
     redirectTo: 'produtos',
   },
