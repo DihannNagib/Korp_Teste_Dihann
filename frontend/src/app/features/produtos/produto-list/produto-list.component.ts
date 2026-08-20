@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { finalize } from 'rxjs';
 
@@ -20,8 +21,10 @@ import { Produto } from '../../../core/models/produto.model';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatCardModule,
   ],
   templateUrl: './produto-list.component.html',
+  styleUrl: './produto-list.component.scss',
 })
 export class ProdutoListComponent implements OnInit {
   private produtoService = inject(ProdutoService);

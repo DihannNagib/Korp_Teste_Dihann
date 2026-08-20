@@ -24,10 +24,12 @@ import { ApiErrorResponse } from '../../../core/models/api-error.model';
     MatChipsModule,
   ],
   templateUrl: './nota-detail.component.html',
+  styleUrl: './nota-detalhe.component.scss',
 })
 export class NotaDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private notaService = inject(NotaFiscalService);
+  private numeroAtual: number | null = null;
 
   nota: NotaFiscal | null = null;
   carregando = false;
@@ -35,16 +37,21 @@ export class NotaDetailComponent implements OnInit {
   erro: string | null = null;
 
   ngOnInit(): void {
-    const numero = Number(this.route.snapshot.paramMap.get('numero'));
-    this.carregar(numero);
+    this.numeroAtual = Number(this.route.snapshot.paramMap.get('numero'));
+    if (this.numeroAtual) {
+      this.carregar();
+    } else {
+      this.erro = 'Número da nota inválido.';
+    }
   }
 
-  carregar(numero: number): void {
+  carregar(): void {
+    if (!this.numeroAtual) return;
     this.carregando = true;
     this.erro = null;
 
     this.notaService
-      .buscarPorNumero(numero)
+      .buscarPorNumero(this.numeroAtual)
       .pipe(finalize(() => (this.carregando = false)))
       .subscribe({
         next: (nota) => (this.nota = nota),

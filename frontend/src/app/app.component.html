@@ -1,10 +1,43 @@
-<mat-toolbar color="primary">
-  <span>Sistema de emissão de Notas Fiscais</span>
-  <span style="flex: 1 1 auto"></span>
-  <button mat-button routerLink="/produtos" routerLinkActive="active-link">Produtos</button>
-  <button mat-button routerLink="/notas" routerLinkActive="active-link">Notas Fiscais</button>
+<mat-toolbar color="primary" class="app-toolbar">
+  <div class="toolbar-content">
+    <div class="logo-area">
+      <button mat-icon-button class="menu-toggle" (click)="drawer.toggle()" aria-label="Menu">
+        <mat-icon>menu</mat-icon>
+      </button>
+      <span class="brand">KorpNF</span>
+      <span class="brand-sub">Sistema de Notas Fiscais</span>
+    </div>
+
+    <nav class="nav-links-desktop">
+      <a mat-button routerLink="/produtos" routerLinkActive="active-link">Produtos</a>
+      <a mat-button routerLink="/notas" routerLinkActive="active-link">Notas Fiscais</a>
+    </nav>
+  </div>
 </mat-toolbar>
 
-<main style="padding: 24px; max-width: 1000px; margin: 0 auto">
-  <router-outlet />
-</main>
+<mat-sidenav-container class="sidenav-container">
+  <mat-sidenav #drawer mode="over" position="start" class="app-sidenav">
+    <div class="sidenav-header">
+      <span class="brand">KorpNF</span>
+      <button mat-icon-button (click)="drawer.close()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <mat-nav-list>
+      <a mat-list-item routerLink="/produtos" (click)="drawer.close()" routerLinkActive="active-link">
+        Produtos
+      </a>
+      <a mat-list-item routerLink="/notas" (click)="drawer.close()" routerLinkActive="active-link">
+        Notas Fiscais
+      </a>
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <main class="app-main">
+      <div class="content-container">
+        <router-outlet />
+      </div>
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

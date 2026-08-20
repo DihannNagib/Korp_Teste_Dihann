@@ -1,42 +1,157 @@
-<h2>Nova Nota Fiscal</h2>
-
-<form [formGroup]="form" (ngSubmit)="salvar()" style="max-width:600px">
-  <div formArrayName="itens">
-    @for (item of itens.controls; track item; let i = $index) {
-      <div [formGroupName]="i" style="display:flex; gap:8px; align-items:flex-start; margin-bottom:8px">
-        <mat-form-field style="flex:1">
-          <mat-label>Código do produto</mat-label>
-          <input matInput formControlName="produtoCodigo" />
-        </mat-form-field>
-
-        <mat-form-field style="width:140px">
-          <mat-label>Quantidade</mat-label>
-          <input matInput type="number" formControlName="quantidade" />
-        </mat-form-field>
-
-        <button mat-icon-button type="button" (click)="removerItem(i)" [disabled]="itens.length === 1" style="margin-top:8px">
-          <mat-icon>delete</mat-icon>
+<div class="form-container">
+  <div class="form-header">
+    <h2>Nova Nota Fiscal</h2>
+    <p class="subtitle">
+      Preencha os itens da nota fiscal. A numeração será gerada automaticamente.
+    </p>
+  </div>
+  <form [formGroup]="form" (ngSubmit)="salvar()" class="nota-form">
+    <div class="itens-section">
+      <div class="section-header">
+        <span class="section-title">Itens da Nota</span>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="adicionarItem()"
+          class="btn-adicionar"
+          [disabled]="carregandoProdutos || produtos.length === 0"
+        >
+          <mat-icon>add</mat-icon>
+          Adicionar item
         </button>
       </div>
-    }
-  </div>
-
-  <button mat-stroked-button type="button" (click)="adicionarItem()">
-    <mat-icon>add</mat-icon> Adicionar item
-  </button>
-
-  @if (erroGeral) {
-    <p style="color:#b00020">{{ erroGeral }}</p>
-  }
-
-  <div style="margin-top:16px; display:flex; gap:8px">
-    <button mat-raised-button color="primary" type="submit" [disabled]="salvando">
-      @if (salvando) {
-        <mat-spinner diameter="20" style="display:inline-block" />
-      } @else {
-        Criar Nota
+      @if (carregandoProdutos) {
+        <div class="loading-products">
+          <mat-spinner diameter="24"></mat-spinner>
+          <span>Carregando produtos...</span>
+        </div>
       }
-    </button>
-    <button mat-button type="button" routerLink="/notas">Cancelar</button>
-  </div>
-</form>
+      <div formArrayName="itens" class="itens-list">
+        @for (item of itens.controls; track item; let i = $index) {
+          <div [formGroupName]="i" class="item-row">
+            <div class="item-fields">
+              <mat-form-field
+                appearance="outline"
+                class="field-codigo"
+              >
+                <mat-label>Produto</mat-label>
+                <input
+                  matInput
+                  formControlName="produtoCodigo"
+                  placeholder="Buscar produto..."
+                  [matAutocomplete]="auto"
+                  autocomplete="off"
+                />
+                <mat-icon matSuffix>search</mat-icon>
+                <mat-autocomplete #auto="matAutocomplete">
+                  @for (
+                    produto of filtrarProdutos(
+                      item.get('produtoCodigo')?.value ?? ''
+                    );
+                    track produto.codigo
+                  ) {
+                    <mat-option [value]="produto.codigo">
+                      <div class="produto-option">
+                        <div>
+                          <strong>{{ produto.codigo }}</strong>
+                          <span> — {{ produto.descricao }}</span>
+                        </div>
+                        <small>
+                          Saldo: {{ produto.saldo }}
+                        </small>
+                      </div>
+                    </mat-option>
+                  }
+                </mat-autocomplete>
+                @if (
+                  item.get('produtoCodigo')?.hasError('required') &&
+                  item.get('produtoCodigo')?.touched
+                ) {
+                  <mat-error>
+                    Produto obrigatório
+                  </mat-error>
+                } @else if (
+                  item.get('produtoCodigo')?.touched &&
+                  item.get('produtoCodigo')?.value &&
+                  !produtoExiste(item.get('produtoCodigo')?.value)
+                ) {
+                  <mat-error>
+                    Selecione um produto existente
+                  </mat-error>
+                }
+              </mat-form-field>
+              <mat-form-field
+                appearance="outline"
+                class="field-quantidade"
+              >
+                <mat-label>Quantidade</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  formControlName="quantidade"
+                  min="1"
+                />
+                @if (
+                  item.get('quantidade')?.invalid &&
+                  item.get('quantidade')?.touched
+                ) {
+                  <mat-error>
+                    Quantidade deve ser maior que zero
+                  </mat-error>
+                }
+              </mat-form-field>
+            </div>
+            <button
+              mat-icon-button
+              type="button"
+              (click)="removerItem(i)"
+              [disabled]="itens.length === 1"
+              class="btn-remover"
+              aria-label="Remover item"
+            >
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+    @if (erroGeral) {
+      <div class="error-global">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ erroGeral }}</span>
+      </div>
+    }
+    <div class="form-actions">
+      <button
+        mat-raised-button
+        color="primary"
+        type="submit"
+        [disabled]="salvando || carregandoProdutos || produtos.length === 0"
+        class="btn-salvar"
+      >
+        @if (salvando) {
+          <span class="btn-content">
+            <mat-spinner
+              diameter="20"
+              class="spinner-inline"
+            ></mat-spinner>
+            <span>Criando...</span>
+          </span>
+        } @else {
+          <span class="btn-content">
+            <mat-icon>save</mat-icon>
+            <span>Criar Nota</span>
+          </span>
+        }
+      </button>
+      <button
+        mat-stroked-button
+        type="button"
+        routerLink="/notas"
+        class="btn-cancelar"
+      >
+        Cancelar
+      </button>
+    </div>
+  </form>
+</div>

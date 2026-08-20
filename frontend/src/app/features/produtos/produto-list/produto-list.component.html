@@ -1,41 +1,90 @@
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px">
-  <h2>Produtos</h2>
-  <button mat-raised-button color="primary" routerLink="/produtos/novo">
-    <mat-icon>add</mat-icon> Novo Produto
-  </button>
-</div>
+<div class="produtos-container">
+  <div class="header">
+    <h1 class="page-title">Produtos</h1>
+    <button 
+      mat-raised-button 
+      color="primary" 
+      routerLink="/produtos/novo"
+      class="btn-novo"
+    >
+      <mat-icon>add</mat-icon>
+      Novo Produto
+    </button>
+  </div>
 
-@if (carregando) {
-  <mat-spinner diameter="32" />
-}
-
-@if (erro) {
-  <p style="color:#b00020">{{ erro }}</p>
-  <button mat-stroked-button (click)="carregar()">Tentar novamente</button>
-}
-
-@if (!carregando && !erro) {
-  @if (produtos.length === 0) {
-    <p>Nenhum produto cadastrado ainda.</p>
-  } @else {
-    <table mat-table [dataSource]="produtos" style="width:100%">
-      <ng-container matColumnDef="codigo">
-        <th mat-header-cell *matHeaderCellDef>Código</th>
-        <td mat-cell *matCellDef="let p">{{ p.codigo }}</td>
-      </ng-container>
-
-      <ng-container matColumnDef="descricao">
-        <th mat-header-cell *matHeaderCellDef>Descrição</th>
-        <td mat-cell *matCellDef="let p">{{ p.descricao }}</td>
-      </ng-container>
-
-      <ng-container matColumnDef="saldo">
-        <th mat-header-cell *matHeaderCellDef>Saldo</th>
-        <td mat-cell *matCellDef="let p">{{ p.saldo }}</td>
-      </ng-container>
-
-      <tr mat-header-row *matHeaderRowDef="colunas"></tr>
-      <tr mat-row *matRowDef="let row; columns: colunas"></tr>
-    </table>
+  @if (carregando) {
+    <div class="loading-state">
+      <mat-spinner diameter="40" color="primary"></mat-spinner>
+      <span>Carregando produtos...</span>
+    </div>
   }
-}
+
+  @if (erro) {
+    <div class="error-state">
+      <mat-icon color="warn">error_outline</mat-icon>
+      <p>{{ erro }}</p>
+      <button mat-stroked-button color="primary" (click)="carregar()">
+        <mat-icon>refresh</mat-icon> Tentar novamente
+      </button>
+    </div>
+  }
+
+  @if (!carregando && !erro) {
+    @if (produtos.length === 0) {
+      <div class="empty-state">
+        <mat-icon>inbox</mat-icon>
+        <p>Nenhum produto cadastrado ainda.</p>
+        <button 
+          mat-raised-button 
+          color="primary" 
+          routerLink="/produtos/novo"
+        >
+          Cadastrar primeiro produto
+        </button>
+      </div>
+    } @else {
+      <div class="table-wrapper">
+        <table 
+          mat-table 
+          [dataSource]="produtos" 
+          class="mat-elevation-z2 produtos-table"
+        >
+          <ng-container matColumnDef="codigo">
+            <th mat-header-cell *matHeaderCellDef> Código </th>
+            <td mat-cell *matCellDef="let p"> {{ p.codigo }} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="descricao">
+            <th mat-header-cell *matHeaderCellDef> Descrição </th>
+            <td mat-cell *matCellDef="let p"> {{ p.descricao }} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="saldo">
+            <th mat-header-cell *matHeaderCellDef> Saldo </th>
+            <td mat-cell *matCellDef="let p"> {{ p.saldo }} </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="colunas"></tr>
+          <tr mat-row *matRowDef="let row; columns: colunas"></tr>
+        </table>
+      </div>
+
+      <div class="cards-mobile">
+        @for (produto of produtos; track produto.codigo) {
+          <mat-card class="produto-card" appearance="outlined">
+            <mat-card-header>
+              <mat-card-title>{{ produto.descricao }}</mat-card-title>
+              <mat-card-subtitle>Código: {{ produto.codigo }}</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="saldo-info">
+                <span class="saldo-label">Saldo em estoque</span>
+                <span class="saldo-valor">{{ produto.saldo }}</span>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        }
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,119 @@
+@use '@angular/material' as mat;
+
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+
+  .form-header {
+    margin-bottom: 32px;
+
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #1a237e;
+      margin: 0 0 4px 0;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: #5c6bc0;
+      margin: 0;
+    }
+  }
+
+  .produto-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .full-width {
+      width: 100%;
+    }
+
+    .error-global {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffebee;
+      border: 1px solid #ef9a9a;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #c62828;
+      font-weight: 500;
+
+      mat-icon {
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+      }
+    }
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+
+  .btn-salvar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 120px;
+
+    .btn-content {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .spinner-inline {
+      display: inline-flex;
+      align-items: center;
+      margin-right: 4px;
+      flex-shrink: 0;
+    }
+
+    span {
+      display: inline-flex;
+      align-items: center;
+    }
+  }
+
+  .btn-cancelar {
+    min-width: 100px;
+  }
+}
+  }
+
+  @media (max-width: 600px) {
+    padding: 12px;
+
+    .form-header {
+      h2 {
+        font-size: 1.4rem;
+      }
+      .subtitle {
+        font-size: 0.85rem;
+      }
+    }
+
+    .produto-form .form-actions {
+      flex-direction: column;
+      align-items: stretch;
+
+      .btn-salvar,
+      .btn-cancelar {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  }
+
+  @media (max-width: 400px) {
+    .form-header h2 {
+      font-size: 1.2rem;
+    }
+  }
+}

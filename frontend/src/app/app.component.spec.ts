@@ -22,9 +22,8 @@ describe('AppComponent', () => {
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
+    const toolbarText = compiled.textContent || '';
 
-    expect(compiled.querySelector('span')?.textContent).toContain(
-      'Sistema de emissão de Notas Fiscais',
-    );
+    expect(toolbarText).toContain('Sistema de Notas Fiscais');
   });
 });

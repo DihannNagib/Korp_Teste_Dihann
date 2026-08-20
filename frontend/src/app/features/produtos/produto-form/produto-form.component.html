@@ -1,42 +1,64 @@
-<h2>Novo Produto</h2>
-
-<form [formGroup]="form" (ngSubmit)="salvar()" style="display:flex; flex-direction:column; gap:8px; max-width:400px">
-  <mat-form-field>
-    <mat-label>Código</mat-label>
-    <input matInput formControlName="codigo" />
-    @if (form.controls.codigo.invalid && form.controls.codigo.touched) {
-      <mat-error>Código é obrigatório</mat-error>
-    }
-  </mat-form-field>
-
-  <mat-form-field>
-    <mat-label>Descrição</mat-label>
-    <input matInput formControlName="descricao" />
-    @if (form.controls.descricao.invalid && form.controls.descricao.touched) {
-      <mat-error>Descrição é obrigatória</mat-error>
-    }
-  </mat-form-field>
-
-  <mat-form-field>
-    <mat-label>Saldo inicial</mat-label>
-    <input matInput type="number" formControlName="saldo" />
-    @if (form.controls.saldo.invalid && form.controls.saldo.touched) {
-      <mat-error>Saldo deve ser maior ou igual a zero</mat-error>
-    }
-  </mat-form-field>
-
-  @if (erroGeral) {
-    <p style="color:#b00020">{{ erroGeral }}</p>
-  }
-
-  <div style="display:flex; gap:8px">
-    <button mat-raised-button color="primary" type="submit" [disabled]="salvando">
-      @if (salvando) {
-        <mat-spinner diameter="20" style="display:inline-block" />
-      } @else {
-        Salvar
-      }
-    </button>
-    <button mat-button type="button" routerLink="/produtos">Cancelar</button>
+<div class="form-container">
+  <div class="form-header">
+    <h2>Novo Produto</h2>
+    <p class="subtitle">Preencha os dados do produto para cadastro no estoque</p>
   </div>
-</form>
+
+  <form [formGroup]="form" (ngSubmit)="salvar()" class="produto-form">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Código</mat-label>
+      <input matInput formControlName="codigo" placeholder="Ex: PROD-001" />
+      @if (form.controls.codigo.invalid && form.controls.codigo.touched) {
+        <mat-error>Código é obrigatório</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Descrição</mat-label>
+      <input matInput formControlName="descricao" placeholder="Nome do produto" />
+      @if (form.controls.descricao.invalid && form.controls.descricao.touched) {
+        <mat-error>Descrição é obrigatória</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Saldo inicial</mat-label>
+      <input matInput type="number" formControlName="saldo" placeholder="0" />
+      @if (form.controls.saldo.invalid && form.controls.saldo.touched) {
+        <mat-error>Saldo deve ser maior ou igual a zero</mat-error>
+      }
+    </mat-form-field>
+
+    @if (erroGeral) {
+      <div class="error-global">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ erroGeral }}</span>
+      </div>
+    }
+
+    <div class="form-actions">
+      <button
+        mat-raised-button
+        color="primary"
+        type="submit"
+        [disabled]="salvando"
+        class="btn-salvar"
+      >
+        @if (salvando) {
+          <span class="btn-content">
+            <mat-spinner diameter="20" class="spinner-inline"></mat-spinner>
+            <span>Salvando...</span>
+          </span>
+        } @else {
+          <span class="btn-content">
+            <mat-icon>save</mat-icon>
+            <span>Salvar</span>
+          </span>
+        }
+      </button>
+      <button mat-stroked-button type="button" routerLink="/produtos" class="btn-cancelar">
+        Cancelar
+      </button>
+    </div>
+  </form>
+</div>

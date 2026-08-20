@@ -5,6 +5,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCardModule } from '@angular/material/card';
 import { finalize } from 'rxjs';
 
 import { NotaFiscalService } from '../../../core/services/nota-fiscal.service';
@@ -21,9 +22,11 @@ import { MatIconModule } from '@angular/material/icon';
     MatButtonModule,
     MatChipsModule,
     MatIconModule,
+    MatCardModule,
     MatProgressSpinnerModule,
   ],
   templateUrl: './nota-list.component.html',
+  styleUrl: './nota-list.component.scss',
 })
 export class NotaListComponent implements OnInit {
   private notaService = inject(NotaFiscalService);

@@ -1,0 +1,183 @@
+@use '@angular/material' as mat;
+
+.app-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  padding: 0 16px;
+  height: 64px;
+  background: #1a237e;
+
+  .toolbar-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    height: 100%;
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .menu-toggle {
+      display: none;
+      color: white;
+    }
+
+    .brand {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: white;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-sub {
+      font-size: 0.85rem;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.7);
+      margin-left: 8px;
+      display: none;
+
+      @media (min-width: 768px) {
+        display: inline;
+      }
+    }
+  }
+
+  .nav-links-desktop {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    a {
+      padding: 6px 16px;
+      border-radius: 4px;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 500;
+      transition: background 0.2s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: white;
+      }
+
+      &.active-link {
+        background: rgba(255, 255, 255, 0.18);
+        color: white;
+        box-shadow: inset 0 -2px 0 #ffd54f;
+      }
+    }
+  }
+
+  @media (max-width: 767px) {
+    height: 56px;
+    padding: 0 12px;
+
+    .logo-area {
+      .menu-toggle {
+        display: inline-flex;
+      }
+      .brand {
+        font-size: 1.2rem;
+      }
+      .brand-sub {
+        display: none;
+      }
+    }
+
+    .nav-links-desktop {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    height: 48px;
+    .logo-area .brand {
+      font-size: 1rem;
+    }
+  }
+}
+
+.sidenav-container {
+  height: calc(100vh - 64px);
+
+  @media (max-width: 767px) {
+    height: calc(100vh - 56px);
+  }
+  @media (max-width: 480px) {
+    height: calc(100vh - 48px);
+  }
+}
+
+.app-sidenav {
+  width: 260px;
+  background: white;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  padding: 16px 0;
+
+  .sidenav-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 8px;
+
+    .brand {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #1a237e;
+    }
+
+    button {
+      color: #666;
+    }
+  }
+
+  mat-nav-list {
+    a {
+      color: #333;
+      font-weight: 500;
+      padding: 12px 24px;
+      transition: background 0.2s;
+
+      &:hover {
+        background: #f0f4ff;
+      }
+
+      &.active-link {
+        background: #e8eaf6;
+        color: #1a237e;
+        border-right: 4px solid #1a237e;
+      }
+    }
+  }
+}
+
+.app-main {
+  background: #f4f6f9;
+  padding: 24px 16px;
+  min-height: 100%;
+
+  .content-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    padding: 24px;
+    min-height: 400px;
+
+    @media (max-width: 768px) {
+      padding: 16px;
+    }
+    @media (max-width: 480px) {
+      padding: 12px;
+    }
+  }
+}

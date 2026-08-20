@@ -1,0 +1,326 @@
+@use '@angular/material' as mat;
+
+.detalhe-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+
+  .voltar-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #1a237e;
+    text-decoration: none;
+    font-weight: 500;
+    margin-bottom: 24px;
+    transition: color 0.2s;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    &:hover {
+      color: #0d47a1;
+      text-decoration: underline;
+    }
+  }
+
+  .loading-state,
+  .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+    gap: 16px;
+    background: #f5f7fa;
+    border-radius: 12px;
+    margin-top: 16px;
+
+    mat-spinner {
+      margin-bottom: 8px;
+    }
+
+    p {
+      font-size: 1rem;
+      color: #555;
+      margin: 0;
+    }
+
+    button {
+      margin-top: 8px;
+    }
+  }
+
+  .error-state {
+    background: #ffebee;
+    border: 1px solid #ef9a9a;
+    mat-icon {
+      font-size: 32px;
+      width: 32px;
+      height: 32px;
+    }
+    p {
+      color: #c62828;
+      font-weight: 500;
+    }
+  }
+
+  .nota-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    padding: 24px;
+    margin-top: 8px;
+
+    .nota-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e8eaf6;
+
+      .nota-titulo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+
+        h2 {
+          font-size: 1.6rem;
+          font-weight: 600;
+          color: #1a237e;
+          margin: 0;
+        }
+
+        .status-chip {
+          font-weight: 500;
+          font-size: 0.8rem;
+          padding: 4px 14px;
+          min-height: 28px;
+        }
+      }
+
+      .nota-metadata {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+        color: #555;
+
+        .label {
+          color: #777;
+        }
+        .valor {
+          font-weight: 500;
+          color: #1a237e;
+        }
+      }
+    }
+
+    .itens-section {
+      .itens-titulo {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1a237e;
+        margin: 0 0 16px 0;
+      }
+
+      .table-wrapper {
+        overflow-x: auto;
+        border-radius: 8px;
+        border: 1px solid #e8eaf6;
+
+        .itens-table {
+          width: 100%;
+          border-collapse: collapse;
+
+          thead {
+            background: #f0f4ff;
+            th {
+              padding: 12px 16px;
+              text-align: left;
+              font-weight: 600;
+              color: #1a237e;
+              border-bottom: 2px solid #c5cae9;
+              font-size: 0.9rem;
+            }
+            .quantidade-col {
+              text-align: right;
+              width: 120px;
+            }
+          }
+
+          tbody {
+            tr {
+              border-bottom: 1px solid #e8eaf6;
+              transition: background 0.15s;
+
+              &:hover {
+                background: #f5f7fa;
+              }
+
+              td {
+                padding: 12px 16px;
+                color: #333;
+                font-size: 0.95rem;
+              }
+
+              .produto-cell {
+                font-weight: 500;
+                color: #1a237e;
+              }
+
+              .quantidade-cell {
+                text-align: right;
+                font-weight: 600;
+                color: #2e7d32;
+              }
+            }
+          }
+        }
+      }
+
+      .resumo {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: #f5f7fa;
+        border-radius: 8px;
+        margin-top: 16px;
+
+        .label {
+          font-size: 0.9rem;
+          color: #555;
+        }
+        .valor {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: #1a237e;
+        }
+      }
+    }
+
+    .acoes {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e8eaf6;
+      display: flex;
+      justify-content: flex-end;
+
+      .btn-imprimir {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-width: 160px;
+
+        mat-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+          flex-shrink: 0;
+        }
+
+        .spinner-inline {
+          display: inline-flex;
+          align-items: center;
+          margin-right: 8px;
+        }
+
+        .btn-content {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        span {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    padding: 16px 12px;
+
+    .voltar-link {
+      font-size: 0.9rem;
+    }
+
+    .nota-card {
+      padding: 16px;
+
+      .nota-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+
+        .nota-titulo {
+          h2 {
+            font-size: 1.3rem;
+          }
+        }
+
+        .nota-metadata {
+          font-size: 0.85rem;
+        }
+      }
+
+      .itens-section {
+        .table-wrapper .itens-table {
+          thead th,
+          tbody td {
+            padding: 10px 12px;
+            font-size: 0.85rem;
+          }
+          .quantidade-col,
+          .quantidade-cell {
+            text-align: right;
+            width: 80px;
+          }
+        }
+
+        .resumo {
+          flex-direction: row;
+          justify-content: space-between;
+        }
+      }
+
+      .acoes {
+        justify-content: stretch;
+        .btn-imprimir {
+          width: 100%;
+          justify-content: center;
+        }
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    .nota-card {
+      padding: 12px;
+      .nota-header .nota-titulo h2 {
+        font-size: 1.1rem;
+      }
+      .itens-section .table-wrapper .itens-table {
+        thead th,
+        tbody td {
+          padding: 8px 10px;
+          font-size: 0.8rem;
+        }
+      }
+    }
+  }
+}
