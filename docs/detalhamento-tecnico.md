@@ -1,510 +1,445 @@
 # Detalhamento Técnico
 
-Este documento responde, item a item, aos pontos de detalhamento técnico
-exigidos no enunciado do teste, explicando o **porquê** de cada decisão.
-Passo a passo de execução, endpoints e roteiros de teste estão nos
-READMEs de cada módulo (linkados ao longo deste documento).
+Este documento apresenta as principais decisões técnicas da solução desenvolvida para o desafio de emissão de Notas Fiscais.
+
+A aplicação é composta por um frontend em Angular e dois microsserviços em Go: **Estoque** e **Faturamento**.
+
+Os detalhes de execução, endpoints e roteiros de testes estão disponíveis nos READMEs de cada módulo:
+
+- [Backend — Estoque](../backend/estoque/README.md)
+- [Backend — Faturamento](../backend/faturamento/README.md)
+- [Frontend — Angular](../frontend/README.md)
 
 ---
 
-## 1. Visão Geral e Arquitetura
+## 1. Arquitetura
 
-Arquitetura de microsserviços com dois serviços em Go (Estoque e
-Faturamento), cada um com seu próprio banco PostgreSQL, e um frontend em
-Angular consumindo ambos.
+Foi utilizada uma arquitetura de microsserviços com separação de responsabilidades:
+
+- **Estoque** — cadastro de produtos e controle de saldos.
+- **Faturamento** — criação, consulta e impressão de notas fiscais.
+- **Angular** — interface da aplicação e comunicação com os serviços.
+- **PostgreSQL** — banco independente para cada microsserviço.
 
 ```text
-                                              ┌──────────────────┐
-                                              │     Angular      │
-                                              │      :4200       │
-                                              └────────┬─────────┘
-                                                       │
-                                         ┌─────────────┴─────────────┐
-                                         │                           │
-                                 ┌───────▼───────┐           ┌───────▼───────┐
-                                 │    Estoque    │           │  Faturamento  │
-                                 │     :8080     │◄──────────┤     :8081     │
-                                 └───────┬───────┘   HTTP    └───────┬───────┘
-                                         │                           │
-                                 ┌───────▼───────┐           ┌───────▼───────┐
-                                 │  PostgreSQL   │           │  PostgreSQL   │
-                                 │     :5433     │           │     :5434     │
-                                 └───────────────┘           └───────────────┘
+                         ┌──────────────────┐
+                         │     Angular      │
+                         │      :4200       │
+                         └────────┬─────────┘
+                                  │
+                    ┌─────────────┴─────────────┐
+                    │                           │
+             ┌──────▼───────┐           ┌──────▼────────┐
+             │    Estoque   │   HTTP    │  Faturamento  │
+             │     :8080    │◄──────────│     :8081     │
+             └──────┬───────┘           └──────┬────────┘
+                    │                           │
+             ┌──────▼───────┐           ┌──────▼────────┐
+             │  PostgreSQL  │           │  PostgreSQL   │
+             │     :5433    │           │     :5434     │
+             └──────────────┘           └───────────────┘
 ```
 
-**Por que dois bancos separados:** cada microsserviço é dono exclusivo do
-seu schema. Isso evita acoplamento via banco compartilhado (uma mudança de
-schema no Estoque não pode quebrar o Faturamento) e reflete a
-independência de deploy que a arquitetura de microsserviços exige.
+Cada serviço possui seu próprio banco, evitando compartilhamento de schema e reduzindo o acoplamento entre os microsserviços.
 
-Detalhes de execução de cada serviço:
-[`backend/estoque/README.md`](../backend/estoque/README.md) |
-[`backend/faturamento/README.md`](../backend/faturamento/README.md).
+A comunicação entre Faturamento e Estoque é realizada via HTTP.
 
 ---
 
-## 2. Frontend (Angular)
+# 2. Frontend — Angular
 
-> Seção a ser preenchida conforme o frontend for implementado.
+## 2.1 Ciclos de vida
 
-### 2.1 Ciclos de vida do Angular utilizados
+Foi utilizado principalmente o `ngOnInit`.
 
-*A preencher.*
+Ele é utilizado para inicialização dos componentes e carregamento dos dados necessários:
 
-### 2.2 Uso da biblioteca RxJS
+- `ProdutoListComponent` — carrega os produtos.
+- `NotaListComponent` — carrega as notas.
+- `NotaDetailComponent` — obtém o número da nota pela rota e carrega seus dados.
+- `NotaFormComponent` — carrega os produtos disponíveis para inclusão na nota.
 
-*A preencher — indicar se houve uso (ex: `Observable` em chamadas HTTP,
-`Subject` para comunicação entre componentes, operadores como
-`switchMap`/`catchError`) e por quê.*
-
-### 2.3 Outras bibliotecas utilizadas
-
-*A preencher.*
-
-### 2.4 Bibliotecas de componentes visuais
-
-*A preencher (ex: Angular Material, PrimeNG, ou componentes próprios).*
+O `ngOnDestroy` não foi necessário, pois as chamadas HTTP utilizadas são observables de execução única que completam automaticamente.
 
 ---
 
-## 3. Backend (Go)
+## 2.2 RxJS
 
-### 3.1 Gerenciamento de dependências
+Foi utilizado RxJS através do `HttpClient`, que trabalha com `Observable`.
 
-Go Modules (`go.mod` / `go.sum`), um módulo independente por
-microsserviço — cada serviço declara e versiona só as dependências que
-realmente usa, sem um `go.mod` compartilhado que acoplasse os dois
-serviços.
+Principais recursos utilizados:
 
-### 3.2 Frameworks utilizados
-
-- **Gin** — roteamento HTTP e middlewares (logging, recovery).
-- **GORM** — ORM sobre PostgreSQL: queries, transações e locking.
-
-### 3.3 Tratamento de erros e exceções no backend
-
-O tratamento de erros segue uma separação clara por camada:
-
-**Domínio** — regras de negócio retornam *sentinel errors* Go
-(`errors.New`), sem qualquer conhecimento de HTTP ou banco. Exemplo: a
-regra de saldo não pode ficar negativo vive em `Produto.AjustarSaldo`,
-que retorna `domain.ErrSaldoInsuficiente`. Isso permite testar a regra
-isoladamente, sem banco nem HTTP, e garante que ela vale independente de
-qual camada estiver chamando.
-
-```go
-func (p *Produto) AjustarSaldo(delta int) error {
-	novoSaldo := p.Saldo + delta
-	if novoSaldo < 0 {
-		return ErrSaldoInsuficiente
-	}
-	p.Saldo = novoSaldo
-	return nil
-}
-```
-
-**Repository** — traduz erros nativos de infraestrutura (driver do
-Postgres) para erros de domínio/aplicação. Em vez de fazer uma checagem
-prévia de duplicidade (que teria uma condição de corrida em cenário
-concorrente), o repository deixa a constraint `UNIQUE` do banco arbitrar
-e traduz o erro nativo do driver (`pgconn.PgError`, código `23505`) para
-`repository.ErrCodigoJaExiste`:
-
-```go
-var pgErr *pgconn.PgError
-if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-	return ErrCodigoJaExiste
-}
-```
-
-**Validação de entrada (bind HTTP)** — o Gin usa `validator/v10` via tags
-de struct (`binding:"required"`, `binding:"gte=0"`) para rejeitar payload
-malformado antes de qualquer chamada ao service. O erro nativo do
-validator é traduzido para uma lista de erros por campo, em português,
-consumível diretamente pelo frontend (formato de resposta documentado em
-[`backend/estoque/README.md`](../backend/estoque/README.md#formato-de-erro)).
-
-**Handler** — ponto único de tradução erro → HTTP. A função
-`responderErro` centraliza todo o mapeamento: primeiro verifica se é erro
-de validação (`validator.ValidationErrors`), depois usa `errors.Is` para
-identificar erros de domínio/repository/service específicos e retornar o
-status correto:
-
-| Origem do erro | Status HTTP |
-|---|---|
-| `validator.ValidationErrors` (campo obrigatório/inválido) | `400` |
-| `repository.ErrProdutoNaoEncontrado` | `404` |
-| `repository.ErrCodigoJaExiste` | `409` |
-| `domain.ErrSaldoInsuficiente` | `422` |
-| Erros de validação de negócio do service | `400` |
-| Não mapeado / desconhecido | `400` (payload) |
-
-Centralizar essa tradução em um único ponto evita duplicar `switch`/`if`
-de mapeamento de erro em cada endpoint, e documenta o contrato de erros
-da API em um único lugar do código.
-
-**Panics inesperados** — capturados por `gin.CustomRecovery`, que loga o
-panic e responde `500` com JSON, garantindo que o processo nunca derruba
-por um erro não tratado (ex: nil pointer).
-
-**Health check como sinal de falha de dependência** — `/health` faz
-`Ping()` real no banco a cada chamada e retorna `503` se a conexão
-falhar, em vez de simplesmente responder `200` fixo. Isso é o que
-possibilita observar e testar o cenário obrigatório de falha de
-microsserviço (ver seção 7).
-
-**Faturamento — mapeamento equivalente**, com uma nuance própria: erros
-vindos da chamada ao Estoque durante a impressão são diferenciados em
-três categorias — `ErrSaldoInsuficienteEstoque` (`422`),
-`ErrProdutoNaoEncontradoEstoque` (`404`) e `ErrFalhaComunicacaoEstoque`
-(`503`, cobrindo indisponibilidade de rede/timeout e qualquer status
-HTTP não mapeado explicitamente). Essa diferenciação já existia no
-`client.EstoqueClient` desde a primeira versão do serviço; o `service`
-apenas repassa a classificação original em vez de agrupar tudo sob um
-único erro genérico. Detalhes:
-[`backend/faturamento/README.md`](../backend/faturamento/README.md#mapeamento-de-erro--status-http).
-
-### 3.4 Uso de LINQ / C#
-
-Não aplicável — a solução foi implementada inteiramente em Go, sem uso de
-C#.
+- `finalize()` — controla estados de carregamento tanto em sucesso quanto em erro.
+- `tap()` — utilizado para efeitos colaterais, como emissão de eventos após a impressão.
+- `catchError()` — utilizado no interceptor HTTP para logging centralizado.
+- `Subject` / `Observable` — utilizados para comunicação de eventos entre componentes.
 
 ---
 
-## 4. Domínio de Estoque
+## 2.3 Outras bibliotecas e recursos
 
-A regra de saldo não-negativo vive no método `Produto.AjustarSaldo`, no
-**domínio** — não no repository nem no handler. Essa escolha é o que
-permite testar a regra de negócio isoladamente (ver
-`internal/domain/produto_test.go`), sem depender de banco de dados ou
-HTTP para validar o comportamento.
+### Reactive Forms
 
-Estrutura completa da entidade `Produto`:
-[`backend/estoque/README.md`](../backend/estoque/README.md#entidade-produto).
+Utilizado nos formulários de produtos e notas fiscais.
 
-### 4.1 Persistência e Concorrência
+O formulário de nota utiliza `FormArray` para permitir múltiplos produtos e respectivas quantidades.
 
-O ajuste de saldo roda dentro de uma transação com bloqueio pessimista:
+Também são utilizadas validações para campos obrigatórios, quantidade mínima, existência e duplicidade de produtos.
 
-```sql
-SELECT ... FROM produtos WHERE codigo = ? FOR UPDATE;
-```
+### Angular Router
+
+Utilizado para navegação e para obtenção do número da nota através dos parâmetros da rota.
+
+### Angular HttpClient
+
+Utilizado para comunicação com os microsserviços.
+
+---
+
+## 2.4 Componentes visuais
+
+Foi utilizado **Angular Material**.
+
+Principais módulos:
+
+
+| Módulo                     | Finalidade                   |
+| -------------------------- | ---------------------------- |
+| `MatToolbarModule`         | Navegação                    |
+| `MatSidenavModule`         | Menu lateral                 |
+| `MatListModule`            | Itens de navegação           |
+| `MatTableModule`           | Listagens                    |
+| `MatCardModule`            | Organização das informações  |
+| `MatFormFieldModule`       | Campos de formulário         |
+| `MatInputModule`           | Entrada de dados             |
+| `MatAutocompleteModule`    | Sugestão de produtos         |
+| `MatButtonModule`          | Ações                        |
+| `MatIconModule`            | Ícones                       |
+| `MatChipsModule`           | Status das notas             |
+| `MatProgressSpinnerModule` | Indicadores de processamento |
+
+
+O `MatProgressSpinner` é utilizado durante a impressão, atendendo ao requisito de exibir um indicador de processamento.
+
+---
+
+# 3. Backend — Go
+
+## 3.1 Gerenciamento de dependências
+
+Foi utilizado **Go Modules**, através dos arquivos `go.mod` e `go.sum`.
+
+Cada microsserviço possui seu próprio módulo Go e gerencia suas dependências de forma independente.
+
+---
+
+## 3.2 Frameworks e bibliotecas
+
+- **Gin** — framework HTTP, utilizado para rotas, handlers e middlewares.
+- **GORM** — ORM utilizado para acesso ao PostgreSQL, transações e locking.
+- **PostgreSQL** — persistência dos dados.
+- **golang-migrate** — versionamento do schema através de migrations.
+- **validator/v10** — validação dos payloads recebidos pela API.
+- **godotenv** — carregamento das variáveis de ambiente em desenvolvimento local.
+
+---
+
+## 3.3 C# / LINQ
+
+Não se aplica.
+
+O backend foi desenvolvido integralmente em Go, sem utilização de C# ou LINQ.
+
+---
+
+# 4. Tratamento de erros
+
+O tratamento de erros foi separado por camadas.
+
+### Domínio
+
+As regras de negócio retornam erros específicos (`sentinel errors`), sem dependência de HTTP ou banco de dados.
+
+Exemplo: `ErrSaldoInsuficiente`.
+
+### Repository
+
+Erros de infraestrutura são traduzidos para erros conhecidos pela aplicação.
+
+Por exemplo, a violação da constraint `UNIQUE` do PostgreSQL (`23505`) é convertida para `ErrCodigoJaExiste`.
+
+A constraint do banco é utilizada como fonte de verdade, evitando uma verificação prévia de duplicidade sujeita a condição de corrida.
+
+### Validação
+
+Os payloads são validados antes da execução das regras de negócio através das validações do `validator/v10`.
+
+### Handler
+
+Os handlers traduzem os erros da aplicação para códigos HTTP.
+
+Principais respostas do Estoque:
+
+
+| Situação               | HTTP  |
+| ---------------------- | ----- |
+| Payload inválido       | `400` |
+| Produto não encontrado | `404` |
+| Código já existente    | `409` |
+| Saldo insuficiente     | `422` |
+| Erro inesperado        | `500` |
+
+
+No Faturamento, erros provenientes do Estoque também são classificados como `404`, `422` ou `503`, conforme a causa.
+
+### Panics
+
+O Gin utiliza `CustomRecovery` para capturar panics inesperados, registrar o erro e retornar `500`.
+
+---
+
+# 5. Domínio de Estoque
+
+O Estoque é responsável pelo cadastro dos produtos e controle dos saldos.
+
+A regra de negócio de que o saldo não pode ficar negativo está no domínio, através de `Produto.AjustarSaldo`.
+
+Isso permite testar a regra sem dependência de banco ou HTTP.
+
+## Concorrência
+
+Como requisito opcional, foi implementado **locking pessimista** com `SELECT ... FOR UPDATE` dentro de uma transação.
+
+Isso serializa operações concorrentes sobre o mesmo produto.
+
+Assim, considerando saldo `1` e duas operações simultâneas consumindo `1` unidade:
+
+- uma operação reduz o saldo para `0`;
+- a outra aguarda o lock;
+- ao prosseguir, encontra saldo insuficiente;
+- somente uma operação é concluída com sucesso.
+
+---
+
+# 6. Domínio de Faturamento
+
+O Faturamento é responsável pelas notas fiscais e seus itens.
+
+A nota possui:
+
+- `ID` — identificador técnico;
+- `Número` — numeração fiscal;
+- `Status` — `ABERTA` ou `FECHADA`;
+- `Itens` — produtos e quantidades.
+
+A numeração é gerada pelo PostgreSQL através de uma `SEQUENCE`, garantindo geração sequencial sem depender de lógica de aplicação.
+
+As principais regras de negócio são:
+
+- somente notas `ABERTAS` podem receber itens;
+- a nota deve possuir pelo menos um item para ser impressa;
+- quantidade deve ser maior que zero;
+- notas `FECHADAS` não podem ser impressas novamente;
+- a nota só é fechada após o processamento de todos os itens.
+
+---
+
+# 7. Integração Faturamento → Estoque
+
+Durante a impressão, o Faturamento utiliza um `EstoqueClient` para realizar as operações no microsserviço de Estoque.
+
+O service depende da interface `EstoqueGateway`, permitindo utilizar mocks nos testes.
+
+## Compensação
+
+Os itens são processados individualmente.
+
+Se uma operação posterior falhar, os itens que já foram baixados são estornados e a nota permanece `ABERTA`.
+
+
+
+---
+
+# 8. Banco de dados e Migrations
+
+Foi utilizado **PostgreSQL 15**, com banco independente para cada microsserviço.
+
+
+| Serviço     | Porta  |
+| ----------- | ------ |
+| Estoque     | `5433` |
+| Faturamento | `5434` |
+
+
+Os dados utilizam volumes Docker nomeados:
+
+- `estoque_data`;
+- `faturamento_data`.
+
+O schema é versionado através do **golang-migrate**, utilizando migrations `.up.sql` e `.down.sql`.
+
+A aplicação não depende de `AutoMigrate` durante a execução.
+
+---
+
+# 9. Configuração
+
+As configurações são fornecidas através de variáveis de ambiente, separadas por serviço:
 
 ```text
-Início da transação
-        ↓
-SELECT ... FOR UPDATE      (bloqueia a linha do produto)
-        ↓
-Produto.AjustarSaldo(delta)  (regra de domínio)
-        ↓
-UPDATE
-        ↓
-COMMIT (libera o lock)
+ESTOQUE_*
+FATURAMENTO_*
 ```
 
-Isso serializa o acesso ao mesmo produto: se duas requisições tentarem
-baixar saldo do mesmo produto ao mesmo tempo, a segunda transação
-aguarda a primeira commitar antes de ler o saldo — eliminando a
-possibilidade de saldo negativo por condição de corrida.
+O `godotenv` é utilizado em desenvolvimento local.
 
-Validado manualmente com duas requisições simultâneas contra um produto
-de saldo `1`: uma responde `200`, a outra `422`, nunca as duas com
-sucesso. Passo a passo:
-[`backend/estoque/README.md`](../backend/estoque/README.md#teste-manual-de-concorrência).
+Em ambientes de produção, as variáveis podem ser fornecidas diretamente pela infraestrutura.
 
-## 4.2 Domínio de Faturamento
-
-### 4.2.1 Entidades
-
-`NotaFiscal` possui `numero` (numeração fiscal, exposta ao usuário) e
-`id` (chave técnica) como campos deliberadamente separados, cada um
-gerado por sua própria sequência no Postgres. Isso desacopla a
-numeração sequencial exigida pelo enunciado de detalhes de
-implementação da chave primária — se o schema precisar mudar no
-futuro (ex: chave técnica virar UUID), a sequência de `numero`
-continua intacta.
-
-`ItemNotaFiscal` referencia a nota via chave estrangeira com
-`ON DELETE CASCADE`, e tem `quantidade > 0` reforçado tanto no domínio
-quanto por `CHECK` constraint no banco — mesma filosofia de dupla
-camada de validação aplicada no Estoque.
-
-### 4.2.2 Regras de negócio no domínio
-
-Assim como em `Produto.AjustarSaldo` no Estoque, as regras de transição
-de estado da nota vivem inteiramente no domínio, sem dependência de
-banco ou HTTP:
-
-```go
-func (n *NotaFiscal) AdicionarItem(produtoCodigo string, quantidade int) error {
-	if n.Status != StatusAberta {
-		return ErrNotaNaoAberta
-	}
-	// ... validações de produtoCodigo e quantidade
-}
-
-func (n *NotaFiscal) PodeSerImpressa() error {
-	if n.Status != StatusAberta {
-		return ErrNotaNaoAberta
-	}
-	if len(n.Itens) == 0 {
-		return ErrSemItens
-	}
-	return nil
-}
-```
-
-Uma decisão específica do Faturamento: `Fechar()` retorna `error` e
-recusa fechar uma nota que não esteja `ABERTA`, em vez de ser uma
-operação incondicional. Isso obriga qualquer código chamador (o
-`service`) a lidar explicitamente com esse retorno — reduzindo a
-chance de a nota ser fechada duas vezes por engano em um fluxo com
-múltiplas etapas.
-
-### 4.2.3 Numeração sequencial
-
-```sql
-CREATE SEQUENCE IF NOT EXISTS notas_fiscais_numero_seq
-    START WITH 1
-    INCREMENT BY 1;
-
-CREATE TABLE notas_fiscais (
-    id BIGSERIAL PRIMARY KEY,
-    numero BIGINT NOT NULL UNIQUE
-        DEFAULT nextval('notas_fiscais_numero_seq'),
-    ...
-);
-```
-
-O número é atribuído atomicamente pelo Postgres no momento do insert,
-eliminando qualquer possibilidade de duas notas concorrentes
-receberem o mesmo número — o mesmo princípio de "deixar o banco
-arbitrar" usado na constraint `UNIQUE` de código de produto no
-Estoque (seção 3.3), aplicado agora a uma sequência em vez de uma
-constraint de unicidade simples.
-
-### 4.2.4 Persistência
-
-`AtualizarStatus` faz um `UPDATE` direcionado apenas na coluna
-`status`, em vez de `Save()` no struct completo — evita que o GORM
-dispare upsert das associações (`Itens`) só porque elas estão
-carregadas em memória no momento da chamada. Validado por teste de
-integração dedicado (`TestNotaFiscalRepository_AtualizarStatusNaoAlteraItens`)
-que confirma que os itens permanecem intactos após uma atualização de
-status.
-
-### 4.2.5 Integração com o Estoque e Compensação
-
-A comunicação com o Estoque é feita via `EstoqueClient`
-(`internal/client`), com dois métodos simétricos:
-
-```go
-func (c *EstoqueClient) BaixarItem(produtoCodigo string, quantidade int) error
-func (c *EstoqueClient) EstornarItem(produtoCodigo string, quantidade int) error
-```
-
-Ambos usam o mesmo endpoint do Estoque (`PATCH /produtos/:codigo/saldo`),
-diferindo apenas no sinal do `delta` — reaproveitando a decisão já
-tomada no Estoque de ter um único endpoint de ajuste em vez de rotas
-separadas de baixa/estorno.
-
-O service depende da interface `EstoqueGateway`, não do client
-concreto, permitindo testar `Imprimir` com um mock em testes unitários
-sem subir o Estoque real.
-
-**Baixa item a item com compensação (padrão saga):** ao imprimir,
-`Imprimir` percorre os itens da nota individualmente, acumulando os
-que já foram baixados com sucesso. Se um item falhar, todos os itens
-já processados nesta tentativa são estornados antes do erro ser
-propagado:
-
-```go
-processados := make([]domain.ItemNotaFiscal, 0, len(nota.Itens))
-
-for _, item := range nota.Itens {
-    if err := s.estoque.BaixarItem(item.ProdutoCodigo, item.Quantidade); err != nil {
-        s.compensar(processados)
-        return nil, mapearErroEstoque(err, item.ProdutoCodigo)
-    }
-    processados = append(processados, item)
-}
-```
-
-Essa abordagem — baixar item a item e compensar em caso de falha, em
-vez de delegar a baixa de todos os itens para dentro do client — foi
-adotada porque só o `service` tem visibilidade de **quais** itens já
-foram processados com sucesso no momento da falha; centralizar isso
-no client exigiria que ele expusesse estado ou uma API mais complexa,
-misturando responsabilidades de transporte HTTP com orquestração de
-negócio.
-
-**Garantia obtida:** ou a nota é processada por completo (todos os
-itens baixados, nota `FECHADA`), ou nenhum saldo fica baixado
-"órfão" — nunca um estado intermediário. Isso também torna a operação
-de impressão **segura para retry**: uma nova tentativa após falha
-reprocessa a nota do zero sem duplicar baixas de itens que já tinham
-sido processados e depois compensados.
-
-**Limitação aceita:** a compensação (`estornar`) é "melhor esforço" —
-se o próprio estorno falhar (ex: o Estoque cai no meio da
-compensação), o erro é registrado em log para reconciliação manual,
-não retentado automaticamente nem persistido como pendência. Uma
-evolução possível seria uma fila/tabela de compensações pendentes
-reprocessadas por job assíncrono, fora do escopo desta versão.
-
-Validado por teste unitário
-(`TestImprimir_FalhaNoMeioCompensaItensAnteriores`,
-`TestImprimir_RetryAposCompensacaoNaoDuplicaBaixa`) e por roteiro
-manual com os dois serviços reais:
-[`backend/faturamento/README.md`](../backend/faturamento/README.md#cenário-de-falha-requisito-obrigatório).
-
-Detalhes de execução, schema completo e testes:
-[`backend/faturamento/README.md`](../backend/faturamento/README.md).
+Informações sensíveis não são armazenadas no código-fonte.
 
 ---
 
-## 5. Infraestrutura
+# 10. Tratamento de Falhas
 
-### 5.1 Banco de dados
+O tratamento de falhas atende ao requisito obrigatório do desafio.
 
-PostgreSQL 15, uma instância por microsserviço, cada uma em container
-Docker independente com volume nomeado próprio (`estoque_data`,
-`faturamento_data`), garantindo persistência entre reinícios dos
-containers.
+## 10.1 Falha do banco
 
-### 5.2 Migrations
+Os dois microsserviços possuem `/health`, que realiza um `Ping()` real no banco.
 
-Schema versionado via `golang-migrate`, com arquivos `.up.sql`/`.down.sql`
-por microsserviço — permite aplicar/reverter mudanças de schema de forma
-controlada e rastreável, em vez de depender de `AutoMigrate` em runtime.
-Comandos: [`backend/estoque/README.md`](../backend/estoque/README.md#migrations).
+Quando o banco está disponível, o endpoint retorna `200`.
 
-### 5.3 Configuração
+Quando o banco está indisponível, retorna `503`.
 
-Variáveis de ambiente prefixadas por serviço (`ESTOQUE_*`,
-`FATURAMENTO_*`), carregadas via `godotenv` em desenvolvimento local; em
-produção, fornecidas diretamente pela infraestrutura de execução.
+A aplicação continua em execução e volta a responder normalmente quando a conexão com o banco é restabelecida.
 
-Os dois serviços divergem propositalmente na política de ausência de
-variável: o Estoque aplica um valor padrão (`getEnv` com fallback), o
-Faturamento falha imediatamente na inicialização (`requiredEnv` com
-`log.Fatalf`). Essa segunda abordagem foi escolhida para o Faturamento
-porque ele depende de uma variável crítica adicional
-(`ESTOQUE_SERVICE_URL`) cuja ausência silenciosa levaria a um erro
-difícil de diagnosticar só na hora da impressão da nota — preferimos que
-o processo nem suba se a configuração estiver incompleta.
+## 10.2 Falha Faturamento → Estoque
 
----
+Durante a impressão, se o Estoque estiver indisponível:
 
-## 6. Requisitos Opcionais Implementados
+1. a comunicação falha;
+2. itens já processados são compensados;
+3. a nota permanece `ABERTA`;
+4. o Faturamento retorna `503`;
+5. o frontend apresenta uma mensagem apropriada ao usuário.
 
-- **Tratamento de concorrência:** lock pessimista (`SELECT ... FOR
-  UPDATE`) descrito na seção 4.1, validado manualmente.
-- **Idempotência:** implementada parcialmente via compensação
-  automática (seção 4.2.5) — a operação de impressão é segura para
-  retry após falha, pois qualquer baixa parcial é estornada antes do
-  erro ser propagado. Não há, porém, uma chave de idempotência
-  explícita (ex: header `Idempotency-Key`) nas chamadas HTTP entre os
-  serviços; a garantia atual vem inteiramente do padrão de
-  compensação no nível de aplicação, não de deduplicação na camada de
-  transporte.
-- **Uso de IA:** não implementado nesta versão.
+Para erros de negócio do Estoque:
+
+- `404` — produto não encontrado;
+- `422` — saldo insuficiente;
+- `503` — indisponibilidade ou falha de comunicação.
 
 ---
 
-## 7. Requisito Obrigatório: Tratamento de Falhas
+# 11. Requisitos opcionais
 
-### Falha de banco de dados (Estoque e Faturamento)
+## Concorrência
 
-O cenário de falha de microsserviço é observável e testável através do
-`/health` de cada serviço, que verifica a conexão real com o banco
-(`sqlDB.Ping()`) a cada chamada, em vez de responder `200` fixo:
+**Implementado.**
 
-- Banco disponível → `200 {"status":"ok","database":"up"}`
-- Banco indisponível → `503 {"status":"error","database":"down"}`
+Foi utilizado `SELECT ... FOR UPDATE` no controle de saldo.
 
-A aplicação se recupera sozinha assim que a conexão volta a responder,
-sem necessidade de reiniciar o processo. Passo a passo de validação:
-[`backend/estoque/README.md`](../backend/estoque/README.md#teste-de-falha-do-banco).
+## Inteligência Artificial
 
-### Falha na comunicação Faturamento → Estoque
+**Não implementado.**
 
-Durante a impressão de uma nota, se uma chamada ao Estoque falhar (por
-indisponibilidade, saldo insuficiente ou produto não encontrado), o
-Faturamento:
+A funcionalidade era opcional e não foi adicionada sem uma necessidade de negócio relevante para o escopo.
 
-1. Estorna automaticamente qualquer item já baixado com sucesso nesta
-   tentativa (compensação — ver seção 4.2.5);
-2. Não fecha a nota — ela permanece `ABERTA`;
-3. Devolve ao cliente HTTP um status diferenciado conforme a causa
-   (`422` saldo insuficiente, `404` produto não encontrado, `503`
-   indisponibilidade);
-4. Permite nova tentativa de impressão assim que o problema for
-   resolvido, sem risco de dupla baixa nos itens já processados
-   anteriormente.
+## Idempotência
 
-Validado manualmente com dois cenários: falha total (Estoque fora do
-ar) e falha parcial (um item específico inválido no meio de uma nota
-com múltiplos itens), confirmando em ambos os casos que a nota
-permanece `ABERTA`, o saldo dos itens não é duplicado em retry, e o
-saldo do item afetado pela falha volta ao valor original via
-compensação. Roteiro completo:
-[`backend/faturamento/README.md`](../backend/faturamento/README.md#cenário-de-falha-requisito-obrigatório).
+**Não implementada formalmente.**
+
+Não foi utilizado `Idempotency-Key`.
+
+Foi implementado mecanismo de compensação para evitar efeitos parciais durante a impressão.
+
+A compensação reduz o risco de efeitos duplicados em uma nova tentativa, mas não substitui uma implementação formal de idempotência.
 
 ---
 
-## 8. Metodologia de Testes
+# 12. Testes
 
-- **Estoque** — automatizados (`go test ./... -v`): unitários de
-  domínio (sem infraestrutura) e de integração de repository (contra
-  PostgreSQL real). Manuais: roteiro end-to-end de 18 cenários +
-  concorrência. Roteiro completo:
-  [`backend/estoque/README.md`](../backend/estoque/README.md#roteiro-de-testes-manuais).
-- **Faturamento** — automatizados: unitários de domínio, integração
-  de repository, e unitários de service com mock de `EstoqueGateway`
-  (incluindo compensação e retry após falha parcial). Manuais:
-  roteiro de 21 cenários cobrindo CRUD de notas, transições de
-  status, e os dois cenários obrigatórios de falha (total e parcial)
-  do Estoque. Roteiro completo:
-  [`backend/faturamento/README.md`](../backend/faturamento/README.md#roteiro-de-testes-manuais-completo).
+## Estoque
+
+Foram implementados:
+
+- testes unitários de domínio;
+- testes de integração do repository com PostgreSQL real;
+- testes da API;
+- testes manuais dos principais fluxos;
+- teste de concorrência.
+
+## Faturamento
+
+Foram implementados:
+
+- testes unitários de domínio;
+- testes de integração do repository;
+- testes do service com mock do `EstoqueGateway`;
+- testes de compensação;
+- testes de retry após falha parcial;
+- testes da API;
+- testes manuais dos principais fluxos;
+- cenários de falha total e parcial do Estoque.
+
+## Frontend
+
+O frontend foi validado através de testes manuais, cobrindo:
+
+- cadastro e listagem de produtos;
+- criação de notas;
+- múltiplos itens;
+- consulta;
+- impressão;
+- indicador de processamento;
+- fechamento;
+- bloqueio de reimpressão;
+- saldo insuficiente;
+- produto inexistente;
+- indisponibilidade do Estoque.
+
+Os roteiros completos estão nos READMEs de cada módulo.
 
 ---
 
-## 9. Estado Atual da Implementação
+# 13. Resumo
 
-### Concluído
 
-- Arquitetura de microsserviços (Estoque + Faturamento) com bancos
-  independentes;
-- Serviço de Estoque completo: domínio, repository, service, handler,
-  validação de payload, tratamento de erros centralizado, testes
-  automatizados e roteiro de testes manuais (18 cenários + concorrência)
-  validados;
-- Serviço de Faturamento completo: domínio (`NotaFiscal` com
-  numeração sequencial via sequência própria do Postgres), repository,
-  cliente HTTP de integração com o Estoque, service com orquestração
-  de impressão e **compensação automática** (padrão saga) em caso de
-  falha parcial, handler com tratamento de erro diferenciado por
-  status HTTP. Testes automatizados de domínio, repository e service
-  (incluindo compensação e retry), e roteiro de 21 cenários manuais,
-  cobrindo os dois cenários obrigatórios de falha (total e parcial)
-  entre os dois serviços;
-- Migrations versionadas de ambos os serviços;
-- Health check de ambos os serviços com verificação real de banco,
-  validado em cenário de falha e recuperação.
+| Requisito                  | Implementação                                            |
+| -------------------------- | -------------------------------------------------------- |
+| Frontend                   | Angular                                                  |
+| Lifecycle                  | `ngOnInit`                                               |
+| Formulários                | Reactive Forms                                           |
+| Comunicação HTTP           | Angular `HttpClient`                                     |
+| RxJS                       | `Observable`, `Subject`, `finalize`, `tap`, `catchError` |
+| Componentes visuais        | Angular Material                                         |
+| Backend                    | Go                                                       |
+| Dependências               | Go Modules                                               |
+| Framework HTTP             | Gin                                                      |
+| ORM                        | GORM                                                     |
+| Banco                      | PostgreSQL 15                                            |
+| Migrations                 | golang-migrate                                           |
+| Validação                  | validator/v10                                            |
+| Microsserviços             | Estoque + Faturamento                                    |
+| Comunicação entre serviços | HTTP                                                     |
+| Concorrência               | `SELECT ... FOR UPDATE`                                  |
+| Numeração                  | PostgreSQL `SEQUENCE`                                    |
+| Falhas                     | `/health` + compensação                                  |
+| IA                         | Não implementada                                         |
+| Idempotência formal        | Não implementada                                         |
+| Testes backend             | Unitários + integração + API + manuais                   |
+| Testes frontend            | Manuais                                                  |
+| C# / LINQ                  | Não aplicável                                            |
 
-### Limitações conhecidas
 
-- A compensação (estorno) em caso de falha parcial na impressão é
-  "melhor esforço": se o próprio estorno falhar, o erro é apenas
-  registrado em log, sem retry automático ou persistência de
-  pendência para reconciliação (ver seção 4.2.5);
-- Não há chave de idempotência explícita (`Idempotency-Key`) nas
-  chamadas HTTP entre Faturamento e Estoque — a garantia de segurança
-  em retry vem da compensação no nível de aplicação, não de um
-  mecanismo de deduplicação na camada de transporte.
+---
 
-### Em andamento
+# 14. Conclusão
 
-- Dockerfile e integração do Faturamento no `docker-compose.yml`;
-- Frontend Angular (telas de cadastro, listagem e impressão de notas).
+A solução atende aos requisitos funcionais e arquiteturais do desafio, utilizando Angular, dois microsserviços independentes em Go e bancos PostgreSQL separados.
+
+Além dos requisitos obrigatórios, foram implementados tratamento de concorrência e compensação de operações parcialmente concluídas durante a impressão.
+
+As principais decisões foram orientadas por separação de responsabilidades, integridade dos dados, isolamento entre microsserviços, tratamento explícito de erros e testabilidade.
+
+Os detalhes de execução, endpoints e roteiros completos de testes estão disponíveis nos READMEs específicos de cada módulo.

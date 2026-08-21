@@ -58,10 +58,10 @@ cd backend/estoque
 go run ./cmd
 ```
 
-- **API:** [http://localhost:8080](http://localhost:8080)
-- **Health check:** [http://localhost:8080/health](http://localhost:8080/health) — retorna `200` se o
-serviço e o banco estiverem disponíveis, `503` se a conexão com o
-banco falhar (ver [teste de falha do banco](#teste-de-falha-do-banco)).
+- **API:** http://localhost:8080
+- **Health check:** http://localhost:8080/health — retorna `200` se o
+  serviço e o banco estiverem disponíveis, `503` se a conexão com o
+  banco falhar (ver [teste de falha do banco](#teste-de-falha-do-banco)).
 
 ## Testes automatizados
 
@@ -77,27 +77,23 @@ de `internal/repository` sobem contra o PostgreSQL configurado no `.env`
 
 ## Endpoints
 
-
-| Método | Rota                             | Descrição                                   |
-| ------ | -------------------------------- | ------------------------------------------- |
-| GET    | `/health`                        | Status do serviço e da conexão com o banco  |
-| POST   | `/api/v1/produtos`               | Cria produto                                |
-| GET    | `/api/v1/produtos`               | Lista produtos                              |
-| GET    | `/api/v1/produtos/:codigo`       | Busca produto por código                    |
-| PATCH  | `/api/v1/produtos/:codigo/saldo` | Ajusta saldo (`delta` positivo ou negativo) |
-
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/health` | Status do serviço e da conexão com o banco |
+| POST | `/api/v1/produtos` | Cria produto |
+| GET | `/api/v1/produtos` | Lista produtos |
+| GET | `/api/v1/produtos/:codigo` | Busca produto por código |
+| PATCH | `/api/v1/produtos/:codigo/saldo` | Ajusta saldo (`delta` positivo ou negativo) |
 
 ### Entidade `Produto`
 
-
-| Campo                     | Tipo        | Descrição               |
-| ------------------------- | ----------- | ----------------------- |
-| `id`                      | `uint`      | Identificador           |
-| `codigo`                  | `string`    | Código único do produto |
-| `descricao`               | `string`    | Descrição               |
-| `saldo`                   | `int`       | Saldo atual             |
-| `createdAt` / `updatedAt` | `time.Time` | Auditoria               |
-
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | `uint` | Identificador |
+| `codigo` | `string` | Código único do produto |
+| `descricao` | `string` | Descrição |
+| `saldo` | `int` | Saldo atual |
+| `createdAt` / `updatedAt` | `time.Time` | Auditoria |
 
 ### Exemplo — criar produto
 
@@ -140,28 +136,26 @@ os fluxos que os testes automatizados não exercitam fim-a-fim (handler +
 service + repository + banco juntos, incluindo persistência entre
 reinícios do processo).
 
-
-| #   | Cenário                       | Requisição                                                                               | Esperado                                                                                                                    |
-| --- | ----------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Health check                  | `GET /health`                                                                            | `200` `{"status":"ok","database":"up"}`                                                                                     |
-| 2   | Listar vazio/existente        | `GET /api/v1/produtos`                                                                   | `200` array                                                                                                                 |
-| 3   | Criar produto                 | `POST /api/v1/produtos` `{"codigo":"PROD-001","descricao":"Produto teste","saldo":10}`   | `201` produto criado                                                                                                        |
-| 4   | Persistência após restart     | reiniciar o processo (`Ctrl+C` → `go run ./cmd`), depois `GET /api/v1/produtos/PROD-001` | produto continua com saldo `10` — comprova persistência real, não em memória                                                |
-| 5   | Saldo inicial negativo        | `POST` com `"saldo": -10`                                                                | `400`                                                                                                                       |
-| 6   | Código vazio                  | `POST` com `"codigo": ""`                                                                | `400`                                                                                                                       |
-| 7   | Descrição vazia               | `POST` com `"descricao": ""`                                                             | `400`                                                                                                                       |
-| 8   | Código duplicado              | repetir `POST` com `"codigo":"PROD-001"`                                                 | `409` `{"erro":"codigo de produto ja cadastrado"}` — comprova que a unicidade é garantida pela constraint do Postgres       |
-| 9   | Buscar existente              | `GET /api/v1/produtos/PROD-001`                                                          | `200`                                                                                                                       |
-| 10  | Buscar inexistente            | `GET /api/v1/produtos/NAO-EXISTE`                                                        | `404` `{"erro":"produto nao encontrado"}`                                                                                   |
-| 11  | Ajuste — entrada              | `PATCH /api/v1/produtos/PROD-001/saldo` `{"delta":5}`                                    | `200`, saldo `10 → 15`                                                                                                      |
-| 12  | Ajuste — saída                | `{"delta":-3}`                                                                           | `200`, saldo `15 → 12`                                                                                                      |
-| 13  | Saldo insuficiente            | `{"delta":-100}`                                                                         | `422` `{"erro":"saldo insuficiente"}` **e** `GET` do produto continua mostrando saldo `12` — comprova rollback da transação |
-| 14  | Delta zero                    | `{"delta":0}`                                                                            | `400`                                                                                                                       |
-| 15  | Ajuste em produto inexistente | `PATCH /api/v1/produtos/NAO-EXISTE/saldo`                                                | `404`                                                                                                                       |
-| 16  | JSON malformado               | `POST` com corpo inválido (`{"codigo":}`)                                                | `400`                                                                                                                       |
-| 17  | Persistência (2ª rodada)      | reiniciar o processo novamente, `GET /api/v1/produtos/PROD-001`                          | produto continua existindo                                                                                                  |
-| 18  | Banco indisponível            | ver [teste de falha do banco](#teste-de-falha-do-banco)                                  | `503`                                                                                                                       |
-
+| # | Cenário | Requisição | Esperado |
+|---|---|---|---|
+| 1 | Health check | `GET /health` | `200` `{"status":"ok","database":"up"}` |
+| 2 | Listar vazio/existente | `GET /api/v1/produtos` | `200` array |
+| 3 | Criar produto | `POST /api/v1/produtos` `{"codigo":"PROD-001","descricao":"Produto teste","saldo":10}` | `201` produto criado |
+| 4 | Persistência após restart | reiniciar o processo (`Ctrl+C` → `go run ./cmd`), depois `GET /api/v1/produtos/PROD-001` | produto continua com saldo `10` — comprova persistência real, não em memória |
+| 5 | Saldo inicial negativo | `POST` com `"saldo": -10` | `400` |
+| 6 | Código vazio | `POST` com `"codigo": ""` | `400` |
+| 7 | Descrição vazia | `POST` com `"descricao": ""` | `400` |
+| 8 | Código duplicado | repetir `POST` com `"codigo":"PROD-001"` | `409` `{"erro":"codigo de produto ja cadastrado"}` — comprova que a unicidade é garantida pela constraint do Postgres |
+| 9 | Buscar existente | `GET /api/v1/produtos/PROD-001` | `200` |
+| 10 | Buscar inexistente | `GET /api/v1/produtos/NAO-EXISTE` | `404` `{"erro":"produto nao encontrado"}` |
+| 11 | Ajuste — entrada | `PATCH /api/v1/produtos/PROD-001/saldo` `{"delta":5}` | `200`, saldo `10 → 15` |
+| 12 | Ajuste — saída | `{"delta":-3}` | `200`, saldo `15 → 12` |
+| 13 | Saldo insuficiente | `{"delta":-100}` | `422` `{"erro":"saldo insuficiente"}` **e** `GET` do produto continua mostrando saldo `12` — comprova rollback da transação |
+| 14 | Delta zero | `{"delta":0}` | `400` |
+| 15 | Ajuste em produto inexistente | `PATCH /api/v1/produtos/NAO-EXISTE/saldo` | `404` |
+| 16 | JSON malformado | `POST` com corpo inválido (`{"codigo":}`) | `400` |
+| 17 | Persistência (2ª rodada) | reiniciar o processo novamente, `GET /api/v1/produtos/PROD-001` | produto continua existindo |
+| 18 | Banco indisponível | ver [teste de falha do banco](#teste-de-falha-do-banco) | `503` |
 
 ### Teste de falha do banco
 
@@ -191,9 +185,10 @@ de teste e não faz parte da aplicação):
 
 1. Criar um produto com `saldo: 10`.
 2. Disparar duas requisições `PATCH .../saldo` com `{"delta":-7}` **em
-  paralelo**, contra o mesmo `codigo`.
+   paralelo**, contra o mesmo `codigo`.
 3. Resultado observado: uma requisição responde `200` (saldo vai para
-  3) e a outra responde `422` (`saldo insuficiente`) — nunca as duas  com sucesso, e o saldo final nunca fica negativo.
+   `3`) e a outra responde `422` (`saldo insuficiente`) — nunca as duas
+   com sucesso, e o saldo final nunca fica negativo.
 
 Explicação de por que isso funciona (bloqueio pessimista):
-`[docs/detalhamento-tecnico.md](../../docs/detalhamento-tecnico.md#42-persistência-e-concorrência)`.
+[`docs/detalhamento-tecnico.md`](../../docs/detalhamento-tecnico.md#41-persistência-e-concorrência).

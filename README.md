@@ -6,16 +6,14 @@ microsserviços com frontend em Angular.
 
 ## Visão geral
 
-
-| Módulo                                                 | Responsabilidade                          | Status             |
-| ------------------------------------------------------ | ----------------------------------------- | ------------------ |
-| `[backend/estoque](backend/estoque/README.md)`         | Cadastro de produtos e controle de saldo  | Completo           |
-| `[backend/faturamento](backend/faturamento/README.md)` | Emissão e gestão de notas fiscais         | Em desenvolvimento |
-| `[frontend](frontend/README.md)`                       | Telas Angular consumindo os dois serviços | Em desenvolvimento |
-
+| Módulo | Responsabilidade | Status |
+|---|---|---|
+| [`backend/estoque`](backend/estoque/README.md) | Cadastro de produtos e controle de saldo | Completo |
+| [`backend/faturamento`](backend/faturamento/README.md) | Emissão e gestão de notas fiscais | Completo |
+| [`frontend`](frontend/README.md) | Telas Angular consumindo os dois serviços | Completo |
 
 Detalhamento técnico completo (ciclos de vida, bibliotecas, tratamento de
-erros, decisões de arquitetura): `[docs/detalhamento-tecnico.md](docs/detalhamento-tecnico.md)`.
+erros, decisões de arquitetura): [`docs/detalhamento-tecnico.md`](docs/detalhamento-tecnico.md).
 
 ## Arquitetura
 
@@ -47,9 +45,7 @@ para consultar e baixar saldo no momento da impressão da nota.
 - Docker e Docker Compose
 - Go 1.21+
 - Node.js 18+ e npm
-- `[golang-migrate](https://github.com/golang-migrate/migrate)` (CLI, para rodar as migrations)
-
-
+- [`golang-migrate`](https://github.com/golang-migrate/migrate) (CLI, para rodar as migrations)
 
 ## Subindo o ambiente completo
 
@@ -75,26 +71,21 @@ estão nos READMEs específicos linkados na tabela acima.
 Korp_Teste_Dihann/
 ├── backend/
 │   ├── estoque/        → ver backend/estoque/README.md
-│   └── faturamento/     → ver backend/faturamento/README.md
-├── frontend/             → ver frontend/README.md
+│   └── faturamento/    → ver backend/faturamento/README.md
+├── frontend/            → ver frontend/README.md
 ├── docs/
 │   └── detalhamento-tecnico.md
 ├── .env.example
 ├── docker-compose.yml
-└── README.md             (este arquivo)
+└── README.md            (este arquivo)
 ```
-
-
 
 ## Portas
 
-
-| Serviço                | Porta  |
-| ---------------------- | ------ |
-| Angular                | `4200` |
-| Estoque API            | `8080` |
-| Faturamento API        | `8081` |
-| PostgreSQL Estoque     | `5433` |
+| Serviço | Porta |
+|---|---|
+| Angular | `4200` |
+| Estoque API | `8080` |
+| Faturamento API | `8081` |
+| PostgreSQL Estoque | `5433` |
 | PostgreSQL Faturamento | `5434` |
-
-
